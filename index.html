@@ -1,0 +1,511 @@
+<!doctype html><html lang="es"><head><meta charset="utf-8"><link rel="manifest" href="manifest.webmanifest"><meta name="theme-color" content="#1d6a48"><link rel="icon" href="icon-192.png"><link rel="apple-touch-icon" href="icon-192.png"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0;font:14px system-ui,sans-serif}img{max-width:100%}[hidden]{display:none!important}</style></head><body><title>Morfo Fotos</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=IBM+Plex+Mono:wght@500;600&display=swap">
+<style>
+/* Layout: una sola columna tipo libreta de campo; cada muestra es una etiqueta de espécimen. */
+:root{
+  --bg:#f3f6f2; --surface:#ffffff; --sunk:#e8eee7; --ink:#16211a; --muted:#56665b; --line:#d3ddd4;
+  --accent:#1d6a48; --accent-soft:#dcebe2; --on-accent:#ffffff;
+  --warn:#8f4f00; --warn-soft:#fbecd6; --danger:#b3261e; --danger-soft:#fbe1de;
+  --f-body:"Atkinson Hyperlegible",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,"SFMono-Regular",Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0e1411; --surface:#161f1a; --sunk:#1d2822; --ink:#e4ebe5; --muted:#9aaa9f; --line:#2b3830;
+  --accent:#62c596; --accent-soft:#1f3a2c; --on-accent:#08170f;
+  --warn:#f0b35a; --warn-soft:#3a2a12; --danger:#ff8a80; --danger-soft:#3d1c1a; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0e1411; --surface:#161f1a; --sunk:#1d2822; --ink:#e4ebe5; --muted:#9aaa9f; --line:#2b3830;
+  --accent:#62c596; --accent-soft:#1f3a2c; --on-accent:#08170f;
+  --warn:#f0b35a; --warn-soft:#3a2a12; --danger:#ff8a80; --danger-soft:#3d1c1a; color-scheme:dark}
+
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:16px;line-height:1.45}
+.wrap{max-width:720px;margin:0 auto;padding-block:16px 160px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:flex;flex-direction:column;gap:18px}
+h1,h2,h3{margin:0;text-wrap:balance}
+h1{font-size:1.45rem;letter-spacing:-.01em}
+h2{font-size:1.05rem}
+.mono{font-family:var(--f-mono)}
+.muted{color:var(--muted)}
+.small{font-size:.86rem}
+.eyebrow{font-size:.74rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:700}
+
+header{display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;gap:6px 12px}
+
+/* Proyectos */
+.tabs{display:flex;gap:8px;overflow-x:auto;padding-bottom:2px;scrollbar-width:none}
+.tab{flex:0 0 auto;border:1.5px solid var(--line);background:var(--surface);color:var(--ink);border-radius:999px;padding:9px 16px;font:inherit;font-weight:700;cursor:pointer;display:flex;gap:8px;align-items:center}
+.tab .n{font-family:var(--f-mono);font-size:.8rem;color:var(--muted);font-weight:500}
+.tab[aria-selected="true"]{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
+.tab[aria-selected="true"] .n{color:var(--on-accent);opacity:.8}
+.tab.add{border-style:dashed;color:var(--muted)}
+.addproj{display:flex;gap:8px;flex-wrap:wrap}
+
+/* Controles */
+button{font:inherit}
+.btn{border:0;border-radius:12px;padding:12px 16px;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:48px}
+.btn-primary{background:var(--accent);color:var(--on-accent)}
+.btn-ghost{background:var(--sunk);color:var(--ink)}
+.btn-danger{background:var(--danger-soft);color:var(--danger)}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.btn:focus-visible,.tab:focus-visible,input:focus-visible,textarea:focus-visible,.x:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.btn svg{width:20px;height:20px;flex:0 0 auto}
+input[type=text],input[type=number],textarea{font:inherit;color:var(--ink);background:var(--surface);border:1.5px solid var(--line);border-radius:10px;padding:11px 12px;width:100%;box-sizing:border-box}
+textarea{resize:vertical;min-height:44px}
+label.f{display:flex;flex-direction:column;gap:6px;font-weight:700;font-size:.92rem;min-width:0}
+.code-in{font-family:var(--f-mono);font-size:1.25rem;text-transform:uppercase;letter-spacing:.02em}
+
+/* Panel nueva muestra */
+.panel{background:var(--surface);border:1.5px solid var(--line);border-radius:16px;padding:16px;display:flex;flex-direction:column;gap:14px}
+.newhead{display:flex;justify-content:space-between;align-items:baseline;gap:10px;flex-wrap:wrap}
+.folder{font-family:var(--f-mono);font-weight:600;font-size:1.1rem;display:inline-flex;align-items:center;gap:8px;word-break:break-all}
+.folder svg{width:20px;height:20px;color:var(--accent);flex:0 0 auto}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.msg{border-radius:10px;padding:10px 12px;font-size:.92rem;font-weight:700}
+.msg.err{background:var(--danger-soft);color:var(--danger)}
+.msg.warn{background:var(--warn-soft);color:var(--warn)}
+.msg.ok{background:var(--accent-soft);color:var(--accent)}
+
+/* Fotos */
+.thumbs{display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:10px}
+.ph{position:relative;display:flex;flex-direction:column;gap:4px;min-width:0}
+.ph .img{aspect-ratio:1;max-width:100%;border-radius:10px;background:var(--sunk);overflow:hidden;border:1px solid var(--line)}
+.ph img{width:100%;height:100%;object-fit:cover;display:block}
+.ph .nm{font-family:var(--f-mono);font-size:.76rem;font-weight:600;word-break:break-all}
+.ph .og{font-size:.7rem;color:var(--muted);word-break:break-all;line-height:1.2}
+.x{position:absolute;top:4px;right:4px;width:30px;height:30px;border-radius:999px;border:0;background:rgba(0,0,0,.6);color:#fff;font-size:18px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center}
+.x.arm{background:var(--danger);width:auto;padding:0 10px;font-size:.78rem;font-weight:700}
+
+/* Muestras guardadas: etiqueta de espécimen */
+.list{display:flex;flex-direction:column;gap:12px}
+.card{background:var(--surface);border:1.5px solid var(--line);border-radius:14px;overflow:hidden}
+.card-top{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;padding:12px 14px;border-bottom:1px dashed var(--line);flex-wrap:wrap}
+.range{font-family:var(--f-mono);font-size:.82rem;color:var(--muted)}
+.card-body{padding:12px 14px;display:flex;flex-direction:column;gap:12px}
+.row{display:flex;gap:8px;flex-wrap:wrap}
+.row .btn{flex:1 1 140px}
+.mini{min-height:40px;padding:8px 12px;font-size:.9rem;border-radius:10px}
+
+/* Exportar (barra fija abajo) */
+.dock{position:fixed;left:0;right:0;bottom:0;background:var(--surface);border-top:1.5px solid var(--line);padding-top:10px;padding-bottom:calc(10px + env(safe-area-inset-bottom,0px));padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));z-index:5}
+.dock-in{max-width:720px;margin:0 auto;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.dock-in .info{flex:1 1 100%;min-width:0;font-size:.85rem}
+.dock-in .btn{flex:1 1 0}
+.dock-in .info b{font-family:var(--f-mono)}
+
+/* Vista previa de estructura */
+.tree{font-family:var(--f-mono);font-size:.84rem;background:var(--sunk);border-radius:12px;padding:12px 14px;overflow-x:auto;white-space:pre;line-height:1.6;color:var(--ink)}
+.tree .d{color:var(--accent);font-weight:600}
+.tree .c{color:var(--muted)}
+details summary{cursor:pointer;font-weight:700}
+details[open] summary{margin-bottom:10px}
+.settings{display:flex;gap:10px;align-items:end;flex-wrap:wrap}
+.settings label{flex:0 1 200px}
+.empty{text-align:left;padding:4px 2px;color:var(--muted)}
+.hidden-input{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none}
+@media (max-width:420px){.grid2{grid-template-columns:1fr}}
+@media (prefers-reduced-motion:no-preference){.card,.panel{transition:border-color .2s}}
+</style>
+
+<div class="wrap">
+  <header>
+    <h1>Morfo Fotos</h1>
+    <span class="small muted" id="storeNote">Funciona sin internet · tus fotos quedan en este celular</span>
+  </header>
+
+  <nav class="tabs" id="tabs" role="tablist" aria-label="Proyectos"></nav>
+  <div class="addproj" id="addProj" hidden>
+    <input type="text" id="newProjName" placeholder="Nombre del proyecto" style="flex:1 1 180px">
+    <button class="btn btn-primary" id="newProjOk">Crear</button>
+    <button class="btn btn-ghost" id="newProjCancel">Cancelar</button>
+  </div>
+
+  <section class="panel" aria-labelledby="newTitle">
+    <div class="newhead">
+      <div>
+        <div class="eyebrow" id="newTitle">Nueva muestra</div>
+        <div class="folder" id="draftFolder"></div>
+      </div>
+      <span class="small muted" id="draftCount"></span>
+    </div>
+    <label class="f">Código del morfo
+      <input type="text" id="code" class="code-in" placeholder="MH607" autocomplete="off" autocapitalize="characters" spellcheck="false" inputmode="text">
+    </label>
+    <div id="codeMsg" hidden></div>
+    <div class="grid2">
+      <button class="btn btn-primary" id="btnCam"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8a2 2 0 0 1 2-2h2l2-2h6l2 2h2a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><circle cx="12" cy="13" r="3.5"/></svg>Tomar foto</button>
+      <button class="btn btn-ghost" id="btnGal"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="2"/><path d="m21 16-5-5-9 9"/></svg>Elegir de galería</button>
+    </div>
+    <input type="file" id="fileCam" class="hidden-input" accept="image/*" capture="environment" tabindex="-1" aria-hidden="true">
+    <input type="file" id="fileGal" class="hidden-input" accept="image/*" multiple tabindex="-1" aria-hidden="true">
+    <div class="thumbs" id="draftThumbs"></div>
+    <label class="f">Observaciones <span class="muted small" style="font-weight:400">(opcional)</span>
+      <textarea id="obs" rows="1" placeholder="Ej.: ala dañada, macho"></textarea>
+    </label>
+    <div class="row">
+      <button class="btn btn-primary" id="btnSave" disabled>Guardar muestra</button>
+      <button class="btn btn-ghost" id="btnClear" hidden>Descartar</button>
+    </div>
+  </section>
+
+  <section style="display:flex;flex-direction:column;gap:10px" aria-labelledby="listTitle">
+    <div style="display:flex;justify-content:space-between;align-items:baseline;gap:10px;flex-wrap:wrap">
+      <h2 id="listTitle">Muestras guardadas</h2>
+      <span class="small muted" id="listCount"></span>
+    </div>
+    <div class="list" id="list"></div>
+  </section>
+
+  <details class="panel" id="moreBox">
+    <summary>Cómo quedan las carpetas y ajustes del proyecto</summary>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="tree" id="tree"></div>
+      <p class="small muted" style="margin:0">El ZIP trae la carpeta del proyecto, una carpeta por muestra con las fotos renombradas y el Excel. Pásalo al PC (cable, Drive, WhatsApp o correo) y descomprímelo.</p>
+      <div class="settings">
+        <label class="f">Primera muestra del proyecto
+          <input type="number" id="startNum" min="1" step="1" inputmode="numeric">
+        </label>
+        <span class="small muted" style="flex:1 1 200px">Úsalo si continúas una numeración anterior (por ejemplo, empezar en la 25).</span>
+      </div>
+    </div>
+  </details>
+</div>
+
+<div class="dock">
+  <div class="dock-in">
+    <div class="info" id="dockInfo"></div>
+    <button class="btn btn-ghost mini" id="btnXlsx">Solo Excel</button>
+    <button class="btn btn-primary" id="btnZip">Descargar ZIP</button>
+  </div>
+</div>
+
+<script>
+(function(){
+"use strict";
+const $=s=>document.querySelector(s);
+const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,8);
+const ICON_FOLDER='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M3 6a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>';
+
+/* ---------- Almacenamiento (IndexedDB, con respaldo en memoria) ---------- */
+let idb=null; const memBlobs=new Map(); let persistent=false;
+function openDB(){return new Promise(res=>{try{const r=indexedDB.open("morfofotos",1);
+  r.onupgradeneeded=()=>{const d=r.result;d.createObjectStore("blobs");d.createObjectStore("meta")};
+  r.onsuccess=()=>res(r.result);r.onerror=()=>res(null);r.onblocked=()=>res(null);}catch(e){res(null)}})}
+function tx(store,mode,fn){return new Promise((res,rej)=>{try{const t=idb.transaction(store,mode);const req=fn(t.objectStore(store));
+  t.oncomplete=()=>res(req?req.result:undefined);t.onerror=()=>rej(t.error);t.onabort=()=>rej(t.error);}catch(e){rej(e)}})}
+async function putBlob(id,b){if(!idb){memBlobs.set(id,b);return}await tx("blobs","readwrite",s=>s.put(b,id))}
+async function getBlob(id){if(!idb)return memBlobs.get(id);return tx("blobs","readonly",s=>s.get(id))}
+async function delBlob(id){if(!idb){memBlobs.delete(id);return}try{await tx("blobs","readwrite",s=>s.delete(id))}catch(e){}}
+let saveTimer=null;
+function saveState(){clearTimeout(saveTimer);saveTimer=setTimeout(async()=>{if(!idb)return;try{await tx("meta","readwrite",s=>s.put(JSON.parse(JSON.stringify(state)),"state"))}catch(e){toastStore(true)}},150)}
+async function loadState(){if(!idb)return null;try{return await tx("meta","readonly",s=>s.get("state"))}catch(e){return null}}
+
+/* ---------- Estado ---------- */
+let state={projects:[{id:"bolacha",name:"Bolacha",start:1},{id:"cargadero",name:"Cargadero",start:1}],current:"bolacha",samples:[],draft:{code:"",obs:"",photos:[]}};
+const proj=()=>state.projects.find(p=>p.id===state.current)||state.projects[0];
+const samplesOf=pid=>state.samples.filter(s=>s.projectId===pid).sort((a,b)=>a.num-b.num);
+const nextNum=pid=>{const p=state.projects.find(x=>x.id===pid);const nums=samplesOf(pid).map(s=>s.num);return Math.max((p.start||1)-1,...nums,0)+1};
+const cleanCode=v=>String(v||"").toUpperCase().replace(/[\\/:*?"<>|]/g,"").replace(/\s+/g,"").trim();
+const extOf=(name,type)=>{const m=/\.([a-z0-9]{2,5})$/i.exec(name||"");if(m)return m[1].toLowerCase();return({"image/jpeg":"jpg","image/png":"png","image/heic":"heic","image/heif":"heif","image/webp":"webp"})[type]||"jpg"};
+const photoName=(code,i,ext)=>`${code}_${i+1}${ext?"."+ext:""}`;
+const fmtMB=b=>b>=1e9?(b/1e9).toFixed(2)+" GB":b>=1e6?(b/1e6).toFixed(1)+" MB":Math.max(1,Math.round(b/1e3))+" KB";
+
+/* ---------- Miniaturas ---------- */
+const urlCache=new Map();
+async function fillThumbs(root){
+  for(const img of root.querySelectorAll("img[data-blob]")){
+    const id=img.dataset.blob;
+    if(urlCache.has(id)){img.src=urlCache.get(id);continue}
+    try{const b=await getBlob(id);if(b){const u=URL.createObjectURL(b);urlCache.set(id,u);img.src=u}}catch(e){}
+  }
+}
+function dropUrl(id){const u=urlCache.get(id);if(u){URL.revokeObjectURL(u);urlCache.delete(id)}}
+
+/* ---------- Render ---------- */
+function renderTabs(){
+  const el=$("#tabs");
+  el.innerHTML=state.projects.map(p=>`<button class="tab" role="tab" aria-selected="${p.id===state.current}" data-pid="${esc(p.id)}">${esc(p.name)}<span class="n">${samplesOf(p.id).length}</span></button>`).join("")+
+    `<button class="tab add" id="tabAdd" aria-label="Agregar proyecto">+ Proyecto</button>`;
+}
+function dupInfo(code,exceptId){
+  if(!code)return null;
+  const same=state.samples.find(s=>s.projectId===state.current&&s.code===code&&s.id!==exceptId);
+  if(same)return{type:"err",text:`${code} ya existe en ${proj().name} (muestra ${same.num}). El código no se puede repetir.`};
+  const other=state.samples.find(s=>s.projectId!==state.current&&s.code===code&&s.id!==exceptId);
+  if(other){const op=state.projects.find(p=>p.id===other.projectId);return{type:"warn",text:`Ojo: ${code} ya está en ${op?op.name:"otro proyecto"} (muestra ${other.num}).`}}
+  return null;
+}
+function thumbHTML(code,photos,owner){
+  return photos.map((ph,i)=>`<div class="ph">
+    <div class="img"><img data-blob="${esc(ph.id)}" alt="${esc(photoName(code||"CODIGO",i,""))}"></div>
+    <button class="x" data-del-photo="${esc(ph.id)}" data-owner="${esc(owner)}" aria-label="Quitar foto">×</button>
+    <span class="nm">${esc(photoName(code||"CÓDIGO",i,ph.ext))}</span>
+    <span class="og">${esc(ph.orig)}</span></div>`).join("");
+}
+function renderDraft(){
+  const d=state.draft,code=cleanCode(d.code),n=nextNum(state.current);
+  $("#draftFolder").innerHTML=ICON_FOLDER+esc(`${n}. ${code||"…"}`);
+  $("#draftCount").textContent=d.photos.length?`${d.photos.length} foto${d.photos.length>1?"s":""}`:"Sin fotos aún";
+  if(document.activeElement!==$("#code"))$("#code").value=d.code;
+  if(document.activeElement!==$("#obs"))$("#obs").value=d.obs;
+  const info=dupInfo(code),m=$("#codeMsg");
+  if(info){m.hidden=false;m.className="msg "+info.type;m.textContent=info.text}else m.hidden=true;
+  const blocked=info&&info.type==="err";
+  $("#btnSave").disabled=!code||!d.photos.length||blocked;
+  $("#btnSave").textContent=!code?"Escribe el código":!d.photos.length?"Agrega al menos una foto":blocked?"Código repetido":`Guardar muestra ${n}`;
+  $("#btnClear").hidden=!(d.photos.length||d.code||d.obs);
+  const t=$("#draftThumbs");t.innerHTML=thumbHTML(code,d.photos,"draft");fillThumbs(t);
+}
+function renderList(){
+  const list=samplesOf(state.current).slice().reverse(),el=$("#list");
+  $("#listCount").textContent=list.length?`${list.length} muestra${list.length>1?"s":""}`:"";
+  if(!list.length){el.innerHTML=`<p class="empty">Todavía no hay muestras en ${esc(proj().name)}. La primera quedará en la carpeta <span class="mono">${nextNum(state.current)}. CÓDIGO</span>.</p>`;return}
+  el.innerHTML=list.map(s=>{
+    const first=photoName(s.code,0,""),last=photoName(s.code,s.photos.length-1,"");
+    return `<article class="card" data-sid="${esc(s.id)}">
+      <div class="card-top">
+        <div style="min-width:0"><div class="folder">${ICON_FOLDER}${esc(s.num+". "+s.code)}</div>
+        <div class="range">${s.photos.length} foto${s.photos.length!==1?"s":""} · ${esc(first)} → ${esc(last)}</div></div>
+        <button class="btn btn-ghost mini" data-edit="${esc(s.id)}">Editar</button>
+      </div>
+      <div class="card-body">
+        <div class="thumbs">${thumbHTML(s.code,s.photos,s.id)}</div>
+        ${s.obs?`<div class="small"><span class="eyebrow">Obs.</span> ${esc(s.obs)}</div>`:""}
+        <div class="editbox" hidden></div>
+        <div class="row">
+          <button class="btn btn-ghost mini" data-add-cam="${esc(s.id)}">+ Tomar foto</button>
+          <button class="btn btn-ghost mini" data-add-gal="${esc(s.id)}">+ Galería</button>
+        </div>
+      </div></article>`}).join("");
+  fillThumbs(el);
+}
+function renderEdit(card,s){
+  const box=card.querySelector(".editbox");
+  box.hidden=false;
+  box.innerHTML=`<div style="display:flex;flex-direction:column;gap:10px">
+    <label class="f">Código<input type="text" class="code-in" data-f="code" value="${esc(s.code)}" autocapitalize="characters" spellcheck="false"></label>
+    <div class="msg" data-f="msg" hidden></div>
+    <label class="f">Observaciones<textarea data-f="obs" rows="2">${esc(s.obs||"")}</textarea></label>
+    <div class="row"><button class="btn btn-primary mini" data-f="ok">Guardar cambios</button><button class="btn btn-ghost mini" data-f="cancel">Cancelar</button><button class="btn btn-danger mini" data-f="del">Borrar muestra</button></div></div>`;
+  const ci=box.querySelector('[data-f="code"]'),msg=box.querySelector('[data-f="msg"]'),ok=box.querySelector('[data-f="ok"]');
+  const check=()=>{const c=cleanCode(ci.value),i=dupInfo(c,s.id);if(i){msg.hidden=false;msg.className="msg "+i.type;msg.textContent=i.text}else msg.hidden=true;ok.disabled=!c||(i&&i.type==="err")};
+  ci.addEventListener("input",check);check();
+  ok.onclick=()=>{s.code=cleanCode(ci.value);s.obs=box.querySelector('[data-f="obs"]').value.trim();saveState();renderAll()};
+  box.querySelector('[data-f="cancel"]').onclick=()=>{box.hidden=true;box.innerHTML=""};
+  const del=box.querySelector('[data-f="del"]');
+  del.onclick=async()=>{
+    if(!del.dataset.arm){del.dataset.arm="1";del.textContent=`¿Borrar ${s.num}. ${s.code} y sus fotos? Toca otra vez`;return}
+    state.samples=state.samples.filter(x=>x.id!==s.id);
+    for(const ph of s.photos){dropUrl(ph.id);await delBlob(ph.id)}
+    saveState();renderAll();
+  };
+}
+function renderTree(){
+  const p=proj(),ss=samplesOf(p.id);
+  const demo=ss.length?ss.slice(0,3):[{num:nextNum(p.id),code:"MH607",photos:[{ext:"jpg"},{ext:"jpg"}],demo:1}];
+  let t=`<span class="d">${esc(p.name)}/</span>\n`;
+  demo.forEach(s=>{t+=`├─ <span class="d">${esc(s.num+". "+s.code)}/</span>\n`;s.photos.forEach((ph,i)=>{t+=`│   ├─ ${esc(photoName(s.code,i,ph.ext))}\n`})});
+  if(ss.length>3)t+=`├─ <span class="c">… ${ss.length-3} carpetas más</span>\n`;
+  t+=`└─ ${esc(p.name)}.xlsx`;
+  if(!ss.length)t+=`\n\n<span class="c">(ejemplo de cómo quedará)</span>`;
+  $("#tree").innerHTML=t;
+  if(document.activeElement!==$("#startNum"))$("#startNum").value=p.start||1;
+}
+function renderDock(){
+  const ss=samplesOf(state.current),n=ss.reduce((a,s)=>a+s.photos.length,0),bytes=ss.reduce((a,s)=>a+s.photos.reduce((b,p)=>b+(p.size||0),0),0);
+  $("#dockInfo").innerHTML=ss.length?`<b>${esc(proj().name)}</b> · ${ss.length} muestra${ss.length>1?"s":""} · ${n} fotos · ${fmtMB(bytes)}`:`<b>${esc(proj().name)}</b> · sin muestras para exportar`;
+  $("#btnZip").disabled=!ss.length;$("#btnXlsx").disabled=!ss.length;
+  $("#btnZip").textContent=`Descargar ZIP`;
+}
+function renderAll(){renderTabs();renderDraft();renderList();renderTree();renderDock()}
+
+/* ---------- Agregar fotos ---------- */
+let target="draft";
+async function addFiles(files,owner){
+  const arr=[...files].filter(f=>f&&f.size);
+  if(!arr.length)return;
+  const list=owner==="draft"?state.draft.photos:(state.samples.find(s=>s.id===owner)||{}).photos;
+  if(!list)return;
+  for(const f of arr){
+    const id=uid();
+    try{await putBlob(id,f)}catch(e){memBlobs.set(id,f);toastStore(true)}
+    list.push({id,orig:f.name||"foto",ext:extOf(f.name,f.type),size:f.size,type:f.type||"image/jpeg"});
+  }
+  saveState();renderAll();
+}
+function pick(kind,owner){target=owner;const inp=kind==="cam"?$("#fileCam"):$("#fileGal");inp.value="";inp.click()}
+$("#fileCam").addEventListener("change",e=>addFiles(e.target.files,target));
+$("#fileGal").addEventListener("change",e=>addFiles(e.target.files,target));
+$("#btnCam").onclick=()=>pick("cam","draft");
+$("#btnGal").onclick=()=>pick("gal","draft");
+
+/* ---------- Eventos ---------- */
+$("#code").addEventListener("input",e=>{state.draft.code=e.target.value;saveState();renderDraft()});
+$("#code").addEventListener("blur",e=>{state.draft.code=cleanCode(e.target.value);e.target.value=state.draft.code;saveState();renderDraft()});
+$("#obs").addEventListener("input",e=>{state.draft.obs=e.target.value;saveState()});
+$("#btnSave").onclick=()=>{
+  const d=state.draft,code=cleanCode(d.code),info=dupInfo(code);
+  if(!code||!d.photos.length||(info&&info.type==="err"))return;
+  const num=nextNum(state.current);
+  state.samples.push({id:uid(),projectId:state.current,num,code,obs:d.obs.trim(),photos:d.photos,created:Date.now()});
+  state.draft={code:"",obs:"",photos:[]};
+  $("#code").value="";$("#obs").value="";
+  saveState();renderAll();
+  flash(`Guardada: carpeta ${num}. ${code}`);
+};
+const clr=$("#btnClear");
+clr.onclick=async()=>{
+  if(!clr.dataset.arm){clr.dataset.arm="1";clr.textContent="¿Descartar? Toca otra vez";setTimeout(()=>{delete clr.dataset.arm;clr.textContent="Descartar"},3500);return}
+  delete clr.dataset.arm;clr.textContent="Descartar";
+  for(const ph of state.draft.photos){dropUrl(ph.id);await delBlob(ph.id)}
+  state.draft={code:"",obs:"",photos:[]};$("#code").value="";$("#obs").value="";saveState();renderAll();
+};
+document.addEventListener("click",async e=>{
+  const t=e.target.closest("button");if(!t)return;
+  if(t.dataset.pid){state.current=t.dataset.pid;saveState();renderAll();return}
+  if(t.id==="tabAdd"){$("#addProj").hidden=false;$("#newProjName").focus();return}
+  if(t.dataset.delPhoto){
+    if(!t.classList.contains("arm")){t.classList.add("arm");t.textContent="¿Quitar?";setTimeout(()=>{if(t.isConnected){t.classList.remove("arm");t.textContent="×"}},3000);return}
+    const owner=t.dataset.owner,id=t.dataset.delPhoto;
+    if(owner==="draft")state.draft.photos=state.draft.photos.filter(p=>p.id!==id);
+    else{const s=state.samples.find(x=>x.id===owner);if(s){if(s.photos.length<=1){flash("Una muestra necesita al menos una foto. Para quitarla, usa Editar → Borrar muestra.",true);return}s.photos=s.photos.filter(p=>p.id!==id)}}
+    dropUrl(id);await delBlob(id);saveState();renderAll();return;
+  }
+  if(t.dataset.addCam){pick("cam",t.dataset.addCam);return}
+  if(t.dataset.addGal){pick("gal",t.dataset.addGal);return}
+  if(t.dataset.edit){const card=t.closest(".card"),s=state.samples.find(x=>x.id===t.dataset.edit);if(card&&s)renderEdit(card,s);return}
+});
+$("#newProjCancel").onclick=()=>{$("#addProj").hidden=true;$("#newProjName").value=""};
+$("#newProjOk").onclick=()=>{
+  const name=$("#newProjName").value.trim().replace(/[\\/:*?"<>|]/g,"");
+  if(!name)return;
+  if(state.projects.some(p=>p.name.toLowerCase()===name.toLowerCase())){flash(`Ya existe el proyecto ${name}.`,true);return}
+  const id=uid();state.projects.push({id,name,start:1});state.current=id;
+  $("#addProj").hidden=true;$("#newProjName").value="";saveState();renderAll();
+};
+$("#newProjName").addEventListener("keydown",e=>{if(e.key==="Enter")$("#newProjOk").click()});
+$("#startNum").addEventListener("change",e=>{const v=Math.max(1,parseInt(e.target.value,10)||1);proj().start=v;e.target.value=v;saveState();renderAll()});
+
+/* ---------- ZIP (sin compresión, las fotos ya vienen comprimidas) ---------- */
+const CRC=(()=>{const t=new Uint32Array(256);for(let n=0;n<256;n++){let c=n;for(let k=0;k<8;k++)c=c&1?0xEDB88320^(c>>>1):c>>>1;t[n]=c>>>0}return t})();
+function crc32(u8){let c=0xFFFFFFFF;for(let i=0;i<u8.length;i++)c=CRC[(c^u8[i])&255]^(c>>>8);return(c^0xFFFFFFFF)>>>0}
+async function makeZip(entries,onProgress){
+  const enc=new TextEncoder(),parts=[],central=[];let offset=0;
+  const d=new Date(),time=(d.getHours()<<11)|(d.getMinutes()<<5)|(d.getSeconds()>>1),date=((d.getFullYear()-1980)<<9)|((d.getMonth()+1)<<5)|d.getDate();
+  for(let k=0;k<entries.length;k++){
+    const e=entries[k],nameB=enc.encode(e.name);
+    const u8=e.data instanceof Uint8Array?e.data:new Uint8Array(await e.data.arrayBuffer());
+    const crc=crc32(u8),size=u8.length;
+    const lh=new DataView(new ArrayBuffer(30));
+    lh.setUint32(0,0x04034b50,true);lh.setUint16(4,20,true);lh.setUint16(6,0x0800,true);lh.setUint16(8,0,true);
+    lh.setUint16(10,time,true);lh.setUint16(12,date,true);lh.setUint32(14,crc,true);lh.setUint32(18,size,true);lh.setUint32(22,size,true);
+    lh.setUint16(26,nameB.length,true);lh.setUint16(28,0,true);
+    parts.push(lh.buffer,nameB,e.data instanceof Uint8Array?u8:e.data);
+    const ch=new DataView(new ArrayBuffer(46));
+    ch.setUint32(0,0x02014b50,true);ch.setUint16(4,20,true);ch.setUint16(6,20,true);ch.setUint16(8,0x0800,true);ch.setUint16(10,0,true);
+    ch.setUint16(12,time,true);ch.setUint16(14,date,true);ch.setUint32(16,crc,true);ch.setUint32(20,size,true);ch.setUint32(24,size,true);
+    ch.setUint16(28,nameB.length,true);ch.setUint32(42,offset,true);
+    central.push(ch.buffer,nameB);
+    offset+=30+nameB.length+size;
+    if(onProgress)onProgress(k+1,entries.length);
+  }
+  let cd=0;central.forEach(p=>cd+=p.byteLength);
+  const eo=new DataView(new ArrayBuffer(22));
+  eo.setUint32(0,0x06054b50,true);eo.setUint16(8,entries.length,true);eo.setUint16(10,entries.length,true);eo.setUint32(12,cd,true);eo.setUint32(16,offset,true);
+  return new Blob([...parts,...central,eo.buffer],{type:"application/zip"});
+}
+
+/* ---------- Excel (.xlsx) ---------- */
+const xe=s=>String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+function sheetXml(rows,widths){
+  let x='<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetViews><sheetView workbookViewId="0"><pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews><cols>'+
+    widths.map((w,i)=>`<col min="${i+1}" max="${i+1}" width="${w}" customWidth="1"/>`).join("")+"</cols><sheetData>";
+  rows.forEach((r,ri)=>{x+=`<row r="${ri+1}">`;r.forEach((v,ci)=>{const ref=String.fromCharCode(65+ci)+(ri+1),s=ri===0?' s="1"':"";
+    x+=typeof v==="number"?`<c r="${ref}"${s}><v>${v}</v></c>`:`<c r="${ref}" t="inlineStr"${s}><is><t xml:space="preserve">${xe(v)}</t></is></c>`});x+="</row>"});
+  return x+"</sheetData></worksheet>";
+}
+async function makeXlsx(p){
+  const ss=samplesOf(p.id);
+  const r1=[["MUESTRAS","CÓDIGO","FOTO INICIAL","FOTO FINAL","OBSER"]];
+  ss.forEach(s=>r1.push([s.num,s.code,photoName(s.code,0,""),photoName(s.code,s.photos.length-1,""),s.obs||""]));
+  const r2=[["MUESTRAS","CÓDIGO","CARPETA","FOTO","ARCHIVO","NOMBRE ORIGINAL"]];
+  ss.forEach(s=>s.photos.forEach((ph,i)=>r2.push([s.num,s.code,`${s.num}. ${s.code}`,photoName(s.code,i,""),photoName(s.code,i,ph.ext),ph.orig])));
+  const NS="http://schemas.openxmlformats.org",H='<?xml version="1.0" encoding="UTF-8" standalone="yes"?>',enc=new TextEncoder();
+  const files={
+    "[Content_Types].xml":H+`<Types xmlns="${NS}/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/><Override PartName="/xl/worksheets/sheet2.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/></Types>`,
+    "_rels/.rels":H+`<Relationships xmlns="${NS}/package/2006/relationships"><Relationship Id="rId1" Type="${NS}/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>`,
+    "xl/workbook.xml":H+`<workbook xmlns="${NS}/spreadsheetml/2006/main" xmlns:r="${NS}/officeDocument/2006/relationships"><sheets><sheet name="Muestras" sheetId="1" r:id="rId1"/><sheet name="Detalle fotos" sheetId="2" r:id="rId2"/></sheets></workbook>`,
+    "xl/_rels/workbook.xml.rels":H+`<Relationships xmlns="${NS}/package/2006/relationships"><Relationship Id="rId1" Type="${NS}/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/><Relationship Id="rId2" Type="${NS}/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet2.xml"/><Relationship Id="rId3" Type="${NS}/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>`,
+    "xl/styles.xml":H+`<styleSheet xmlns="${NS}/spreadsheetml/2006/main"><fonts count="2"><font><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="11"/><name val="Calibri"/></font></fonts><fills count="3"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FFDCEBE2"/><bgColor indexed="64"/></patternFill></fill></fills><borders count="2"><border><left/><right/><top/><bottom/><diagonal/></border><border><left style="thin"><color auto="1"/></left><right style="thin"><color auto="1"/></right><top style="thin"><color auto="1"/></top><bottom style="thin"><color auto="1"/></bottom><diagonal/></border></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="2"><xf numFmtId="0" fontId="0" fillId="0" borderId="1" xfId="0" applyBorder="1"/><xf numFmtId="0" fontId="1" fillId="2" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1"/></cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>`,
+    "xl/worksheets/sheet1.xml":sheetXml(r1,[12,14,16,16,40]),
+    "xl/worksheets/sheet2.xml":sheetXml(r2,[12,14,18,14,18,34])
+  };
+  const z=await makeZip(Object.entries(files).map(([name,s])=>({name,data:enc.encode(s)})));
+  return new Blob([z],{type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"});
+}
+
+/* ---------- Descargar ---------- */
+let dlP=null;
+function getDownloads(){if(!dlP)dlP=(window.claude&&typeof window.claude.use==="function")?Promise.resolve(window.claude.use("downloads")).catch(()=>null):Promise.resolve(null);return dlP}
+async function saveFile(name,blob){
+  const inArtifact=!!(window.claude&&typeof window.claude.use==="function");
+  if(inArtifact){
+    const d=await getDownloads();
+    if(!d)throw{code:"unavailable"};
+    await d.save({filename:name,data:blob});return;
+  }
+  const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download=name;document.body.appendChild(a);a.click();
+  setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},8000);
+}
+const today=()=>{const d=new Date();return`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`};
+function errText(e){const c=e&&e.code;return c==="declined"?"Descarga cancelada.":c==="too_large"?"El archivo es demasiado grande para descargarlo de una vez.":c==="unavailable"||c==="not_granted"?"Esta vista no permite descargar archivos. Abre la herramienta en el navegador del celular.":"No se pudo crear el archivo. Inténtalo de nuevo."}
+async function exportZip(){
+  const p=proj(),ss=samplesOf(p.id),btn=$("#btnZip");btn.disabled=true;
+  try{
+    const entries=[];const miss=[];
+    for(const s of ss)for(let i=0;i<s.photos.length;i++){const ph=s.photos[i],b=await getBlob(ph.id);if(!b){miss.push(photoName(s.code,i,ph.ext));continue}entries.push({name:`${p.name}/${s.num}. ${s.code}/${photoName(s.code,i,ph.ext)}`,data:b})}
+    entries.push({name:`${p.name}/${p.name}.xlsx`,data:await makeXlsx(p)});
+    const zip=await makeZip(entries,(k,n)=>{btn.textContent=`Preparando ${k}/${n}…`});
+    btn.textContent="Descargando…";
+    await saveFile(`${p.name}_${today()}.zip`,zip);
+    flash(miss.length?`ZIP listo, pero faltaron ${miss.length} fotos: ${miss.slice(0,4).join(", ")}`:`ZIP de ${p.name} listo (${fmtMB(zip.size)}).`,!!miss.length);
+  }catch(e){flash(errText(e),true)}
+  finally{renderDock()}
+}
+async function exportXlsx(){
+  const p=proj();
+  try{await saveFile(`${p.name}.xlsx`,await makeXlsx(p));flash(`Excel de ${p.name} listo.`)}catch(e){flash(errText(e),true)}
+}
+$("#btnZip").onclick=exportZip;
+$("#btnXlsx").onclick=exportXlsx;
+
+/* ---------- Avisos ---------- */
+let flashT=null;
+function flash(text,bad){
+  let el=$("#flash");
+  if(!el){el=document.createElement("div");el.id="flash";el.setAttribute("role","status");el.style.cssText="position:fixed;left:max(16px,env(safe-area-inset-left,0px));right:max(16px,env(safe-area-inset-right,0px));bottom:calc(84px + env(safe-area-inset-bottom,0px));z-index:6;max-width:688px;margin:0 auto;box-shadow:0 6px 24px rgba(0,0,0,.18)";document.body.appendChild(el)}
+  el.className="msg "+(bad?"err":"ok");el.textContent=text;el.hidden=false;
+  clearTimeout(flashT);flashT=setTimeout(()=>{el.hidden=true},bad?6000:3500);
+}
+function toastStore(bad){
+  $("#storeNote").textContent=bad?"Atención: este navegador no está guardando las fotos. Exporta antes de cerrar.":persistent?"Funciona sin internet · fotos guardadas en este celular":"Funciona sin internet · tus fotos quedan en este celular";
+  $("#storeNote").style.color=bad?"var(--danger)":"";
+}
+
+/* ---------- Inicio ---------- */
+(async function init(){
+  renderAll();
+  idb=await openDB();
+  if(!idb){toastStore(true)}else{
+    const saved=await loadState();
+    if(saved&&saved.projects&&saved.projects.length){state=Object.assign(state,saved);if(!state.draft)state.draft={code:"",obs:"",photos:[]}}
+    try{if(navigator.storage&&navigator.storage.persist)persistent=await navigator.storage.persist()}catch(e){}
+    toastStore(false);
+  }
+  renderAll();
+  getDownloads();
+})();
+})();
+</script>
+<script>if("serviceWorker" in navigator)navigator.serviceWorker.register("sw.js").catch(function(){});</script></body></html>
