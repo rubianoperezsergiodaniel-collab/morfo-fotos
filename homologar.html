@@ -1,0 +1,622 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Homologador de Morfos</title>
+<link rel="icon" href="icon-192.png">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=IBM+Plex+Mono:wght@500;600&display=swap">
+<style>
+/* Layout: flujo en 4 pasos de arriba abajo; resultados en tarjetas de muestra con sus 3 candidatas. */
+:root{
+  --bg:#f3f6f2; --surface:#ffffff; --sunk:#e8eee7; --ink:#16211a; --muted:#56665b; --line:#d3ddd4;
+  --accent:#1d6a48; --accent-soft:#dcebe2; --on-accent:#ffffff;
+  --warn:#8f4f00; --warn-soft:#fbecd6; --danger:#b3261e; --danger-soft:#fbe1de; --info:#1f5a8a; --info-soft:#dde9f5;
+  --f-body:"Atkinson Hyperlegible",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,"SFMono-Regular",Menlo,Consolas,monospace;
+  color-scheme:light;
+}
+@media (prefers-color-scheme: dark){:root{
+  --bg:#0e1411; --surface:#161f1a; --sunk:#1d2822; --ink:#e4ebe5; --muted:#9aaa9f; --line:#2b3830;
+  --accent:#62c596; --accent-soft:#1f3a2c; --on-accent:#08170f;
+  --warn:#f0b35a; --warn-soft:#3a2a12; --danger:#ff8a80; --danger-soft:#3d1c1a; --info:#8cc2f0; --info-soft:#1a2c3d; color-scheme:dark}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:16px;line-height:1.45}
+img{max-width:100%}
+[hidden]{display:none!important}
+.wrap{max-width:1100px;margin:0 auto;padding-block:20px 80px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:flex;flex-direction:column;gap:20px}
+h1,h2,h3{margin:0;text-wrap:balance}
+h1{font-size:1.6rem}
+h2{font-size:1.15rem;display:flex;gap:10px;align-items:baseline}
+h2 .step{font-family:var(--f-mono);font-size:.85rem;color:var(--accent);font-weight:600}
+p{margin:0}
+.muted{color:var(--muted)} .small{font-size:.86rem} .mono{font-family:var(--f-mono)}
+.eyebrow{font-size:.74rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:700}
+.panel{background:var(--surface);border:1.5px solid var(--line);border-radius:16px;padding:18px;display:flex;flex-direction:column;gap:14px}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.btn{border:0;border-radius:12px;padding:10px 16px;font:inherit;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:44px}
+.btn-primary{background:var(--accent);color:var(--on-accent)}
+.btn-ghost{background:var(--sunk);color:var(--ink)}
+.btn-danger{background:var(--danger-soft);color:var(--danger)}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.btn:focus-visible,input:focus-visible,select:focus-visible,.chip:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.btn.sm{min-height:34px;padding:6px 10px;font-size:.86rem;border-radius:9px}
+input[type=text],select{font:inherit;color:var(--ink);background:var(--surface);border:1.5px solid var(--line);border-radius:9px;padding:7px 10px;min-width:0}
+.hidden-input{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none}
+.stat{display:flex;flex-direction:column;gap:2px;padding:10px 14px;background:var(--sunk);border-radius:12px;min-width:120px}
+.stat b{font-family:var(--f-mono);font-size:1.25rem}
+.list{display:flex;flex-direction:column;gap:8px}
+.item{display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:10px 12px;border:1px solid var(--line);border-radius:12px}
+.item .grow{flex:1 1 220px;min-width:0}
+.tag{display:inline-flex;align-items:center;gap:6px;font-size:.78rem;font-weight:700;padding:3px 9px;border-radius:999px;white-space:nowrap}
+.t-ok{background:var(--accent-soft);color:var(--accent)} .t-warn{background:var(--warn-soft);color:var(--warn)} .t-bad{background:var(--danger-soft);color:var(--danger)} .t-info{background:var(--info-soft);color:var(--info)}
+.msg{border-radius:10px;padding:10px 12px;font-size:.92rem}
+.msg.warn{background:var(--warn-soft);color:var(--warn)} .msg.err{background:var(--danger-soft);color:var(--danger)} .msg.info{background:var(--info-soft);color:var(--info)}
+.species-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:10px}
+.sp{display:flex;gap:10px;align-items:center;border:1px solid var(--line);border-radius:12px;padding:8px;min-width:0}
+.sp img{width:52px;height:52px;object-fit:cover;border-radius:8px;flex:0 0 auto;background:var(--sunk)}
+.sp .t{min-width:0;flex:1}
+.sp input{width:100%}
+.sp.off{opacity:.45}
+details>summary{cursor:pointer;font-weight:700}
+details[open]>summary{margin-bottom:12px}
+.progress{height:10px;background:var(--sunk);border-radius:999px;overflow:hidden}
+.progress>div{height:100%;width:0;background:var(--accent);transition:width .2s}
+.sliders{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:14px}
+.sliders label{display:flex;flex-direction:column;gap:4px;font-weight:700;font-size:.9rem}
+.sliders output{font-family:var(--f-mono)}
+input[type=range]{width:100%;accent-color:var(--accent)}
+.filters{display:flex;gap:8px;flex-wrap:wrap}
+.chip{border:1.5px solid var(--line);background:var(--surface);color:var(--ink);border-radius:999px;padding:6px 12px;font:inherit;font-weight:700;cursor:pointer;font-size:.88rem}
+.chip[aria-pressed="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(330px,1fr));gap:14px}
+.card{background:var(--surface);border:1.5px solid var(--line);border-radius:14px;overflow:hidden;display:flex;flex-direction:column;min-width:0}
+.card.s-auto{border-color:var(--accent)} .card.s-revisar{border-color:var(--warn)} .card.s-pendiente{border-color:var(--danger)}
+.card-h{padding:10px 12px;display:flex;justify-content:space-between;gap:8px;align-items:flex-start;border-bottom:1px dashed var(--line)}
+.card-h .nm{font-family:var(--f-mono);font-weight:600;word-break:break-all}
+.photos{display:flex;gap:6px;padding:10px 12px 0;overflow-x:auto}
+.photos img{width:72px;height:72px;object-fit:cover;border-radius:8px;flex:0 0 auto;background:var(--sunk)}
+.cands{display:flex;flex-direction:column;gap:6px;padding:10px 12px}
+.cand{display:flex;gap:10px;align-items:center;border:1.5px solid var(--line);border-radius:10px;padding:6px;background:var(--surface);color:var(--ink);font:inherit;text-align:left;cursor:pointer;width:100%}
+.cand img{width:46px;height:46px;object-fit:cover;border-radius:7px;flex:0 0 auto;background:var(--sunk)}
+.cand .t{flex:1;min-width:0}
+.cand .t b{display:block;word-break:break-word}
+.cand .pct{font-family:var(--f-mono);font-weight:600;font-variant-numeric:tabular-nums}
+.cand[aria-pressed="true"]{border-color:var(--accent);background:var(--accent-soft)}
+.bar{height:5px;background:var(--sunk);border-radius:99px;margin-top:4px;overflow:hidden}.bar>i{display:block;height:100%;background:var(--accent)}
+.card-f{padding:0 12px 12px;display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.card-f select{flex:1 1 150px}
+.empty{color:var(--muted);padding:6px 2px}
+.pdfpages{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:10px}
+.pg{border:1px solid var(--line);border-radius:12px;padding:8px;display:flex;flex-direction:column;gap:6px;min-width:0}
+.pg img{width:100%;aspect-ratio:3/4;object-fit:contain;background:var(--sunk);border-radius:8px}
+.pg.off{opacity:.45}
+.pg label{font-size:.82rem;display:flex;gap:6px;align-items:center}
+.dl{display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:12px;border:1px solid var(--line);border-radius:12px}
+.dl .grow{flex:1 1 240px;min-width:0}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="row" style="justify-content:space-between;align-items:baseline">
+    <div>
+      <h1>Homologador de Morfos</h1>
+      <p class="muted">Compara tus fotos con la referencia y escribe en tu Excel la especie que corresponde a cada muestra.</p>
+    </div>
+    <a class="small" href="./" style="color:var(--accent)">← Morfo Fotos</a>
+  </header>
+
+  <!-- PASO 1 -->
+  <section class="panel">
+    <h2><span class="step">1</span>Referencia</h2>
+    <p class="small muted">Elige la carpeta con las fotos de referencia. Cada subcarpeta es una especie y su nombre es el que se escribirá en el Excel. Puedes agregar también el PDF de referencia.</p>
+    <div class="row">
+      <button class="btn btn-primary" id="btnRefDir">Elegir carpeta de referencia</button>
+      <button class="btn btn-ghost" id="btnRefPdf">Agregar PDF</button>
+      <button class="btn btn-ghost sm" id="btnRefClear" hidden>Quitar referencia</button>
+    </div>
+    <input type="file" id="inRefDir" class="hidden-input" webkitdirectory multiple tabindex="-1">
+    <input type="file" id="inRefPdf" class="hidden-input" accept="application/pdf" multiple tabindex="-1">
+    <div class="row" id="refStats"></div>
+    <div id="refMsg"></div>
+    <details id="refSpeciesBox" hidden>
+      <summary>Especies de referencia (puedes corregir el nombre o excluir alguna)</summary>
+      <div class="species-grid" id="refSpecies"></div>
+    </details>
+    <details id="pdfBox" hidden open>
+      <summary>Imágenes del PDF: revisa la especie de cada una</summary>
+      <p class="small muted" style="margin-bottom:10px">Saqué cada foto del PDF y le puse como nombre el texto de su página. Corrígelo si hace falta y desmarca lo que no sea una especie (portada, índice, logos). Si una página no tiene fotos sueltas, se usa la página completa.</p>
+      <div class="pdfpages" id="pdfPages"></div>
+    </details>
+  </section>
+
+  <!-- PASO 2 -->
+  <section class="panel">
+    <h2><span class="step">2</span>Fotos por homologar</h2>
+    <p class="small muted">Elige la carpeta de un proyecto (por ejemplo <span class="mono">Bolacha</span>, con sus carpetas <span class="mono">1. MH607</span>, <span class="mono">2. MH605</span>… y su Excel). Puedes agregar varias carpetas.</p>
+    <div class="row">
+      <button class="btn btn-primary" id="btnQDir">Agregar carpeta</button>
+    </div>
+    <input type="file" id="inQDir" class="hidden-input" webkitdirectory multiple tabindex="-1">
+    <input type="file" id="inQXlsx" class="hidden-input" accept=".xlsx" tabindex="-1">
+    <div class="list" id="projects"></div>
+  </section>
+
+  <!-- PASO 3 -->
+  <section class="panel">
+    <h2><span class="step">3</span>Comparar</h2>
+    <div class="row">
+      <label class="small" for="model" style="font-weight:700">Método</label>
+      <select id="model">
+        <option value="dino">IA DINOv2 (recomendado para especies)</option>
+        <option value="clip">IA CLIP (alternativa)</option>
+        <option value="basic">Básico sin IA (color y forma, más rápido)</option>
+      </select>
+      <button class="btn btn-primary" id="btnRun" disabled>Comparar fotos</button>
+    </div>
+    <p class="small muted">La primera vez el navegador descarga el modelo de IA (entre 30 y 90 MB). Después queda guardado y no necesita internet. Tus fotos no salen de tu computador.</p>
+    <div id="runBox" hidden>
+      <div class="progress"><div id="prog"></div></div>
+      <p class="small" id="progTxt" style="margin-top:6px"></p>
+    </div>
+    <div id="runMsg"></div>
+  </section>
+
+  <!-- PASO 4 -->
+  <section class="panel" id="resPanel" hidden>
+    <h2><span class="step">4</span>Revisar resultados</h2>
+    <div class="row" id="resStats"></div>
+    <details>
+      <summary>Ajustar qué tan estricta es la comparación</summary>
+      <div class="sliders">
+        <label>Homologar automáticamente desde <output id="oHi"></output><input type="range" id="thHi" min="30" max="99" step="1"></label>
+        <label>Sugerir para revisar desde <output id="oLo"></output><input type="range" id="thLo" min="20" max="98" step="1"></label>
+        <label>Ventaja mínima sobre la 2.ª opción <output id="oMg"></output><input type="range" id="thMg" min="0" max="20" step="0.5"></label>
+      </div>
+      <p class="small muted" style="margin-top:8px">Por debajo de "sugerir", la muestra queda pendiente. Las muestras que tú confirmes a mano no cambian al mover estos valores.</p>
+    </details>
+    <div class="filters" id="filters"></div>
+    <div class="cards" id="cards"></div>
+  </section>
+
+  <!-- PASO 5 -->
+  <section class="panel" id="dlPanel" hidden>
+    <h2><span class="step">5</span>Descargar Excel homologado</h2>
+    <p class="small muted">Se genera una copia de tu Excel con las columnas ESPECIE HOMOLOGADA, SIMILITUD %, ESTADO y REFERENCIA, más una hoja "Homologación" con el detalle de cada foto. Tu Excel original no se modifica.</p>
+    <div class="list" id="dlList"></div>
+  </section>
+</div>
+
+<script src="lib/pdf.min.js"></script>
+<script src="lib/exceljs.min.js"></script>
+<script>
+(function(){
+"use strict";
+const $=s=>document.querySelector(s);
+const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const norm=s=>String(s??"").normalize("NFD").replace(/[̀-ͯ]/g,"").toUpperCase().replace(/\s+/g," ").trim();
+const IMG_RE=/\.(jpe?g|png|webp|gif|bmp)$/i;
+let uidN=0;const uid=()=>"i"+(++uidN);
+
+/* ---------------- Estado ---------------- */
+const S={
+  refs:[],            // {id, species(key), file, path, source:'dir'|'pdf', page, thumb, emb}
+  species:new Map(),  // key -> {key, label, off}
+  pdfPages:[],        // refs con source pdf (también en refs)
+  projects:[],        // {id, name, excel:File|null, samples:[...]}
+  model:null, modelKey:null, extractor:null,
+  analyzed:false, filter:"todas",
+  th:{dino:{hi:70,lo:50,mg:3},clip:{hi:88,lo:78,mg:1.5},basic:{hi:94,lo:85,mg:4}}
+};
+if(window.pdfjsLib)pdfjsLib.GlobalWorkerOptions.workerSrc="lib/pdf.worker.min.js";
+
+/* ---------------- Utilidades de imagen ---------------- */
+async function makeThumb(fileOrCanvas,max){
+  max=max||448;
+  let src;
+  if(fileOrCanvas instanceof HTMLCanvasElement)src=fileOrCanvas;
+  else{
+    try{src=await createImageBitmap(fileOrCanvas)}catch(e){
+      src=await new Promise((res,rej)=>{const im=new Image();im.onload=()=>res(im);im.onerror=()=>rej(new Error("no se pudo leer"));im.src=URL.createObjectURL(fileOrCanvas)});
+    }
+  }
+  const w=src.width,h=src.height,k=Math.min(1,max/Math.max(w,h));
+  const c=document.createElement("canvas");c.width=Math.max(1,Math.round(w*k));c.height=Math.max(1,Math.round(h*k));
+  c.getContext("2d").drawImage(src,0,0,c.width,c.height);
+  if(src.close)src.close();
+  const blob=await new Promise(r=>c.toBlob(r,"image/jpeg",.9));
+  return URL.createObjectURL(blob);
+}
+function l2(v){let s=0;for(const x of v)s+=x*x;s=Math.sqrt(s)||1;return Float32Array.from(v,x=>x/s)}
+function cos(a,b){let s=0;for(let i=0;i<a.length;i++)s+=a[i]*b[i];return s}
+
+/* Método básico: histograma de color HSV + estructura en escala de grises */
+async function basicFeat(url){
+  const im=await new Promise((res,rej)=>{const i=new Image();i.onload=()=>res(i);i.onerror=rej;i.src=url});
+  const c=document.createElement("canvas");c.width=64;c.height=64;const g=c.getContext("2d");g.drawImage(im,0,0,64,64);
+  const d=g.getImageData(0,0,64,64).data;const hist=new Float32Array(8*3*3);const gray=new Float32Array(16*16);
+  for(let y=0;y<64;y++)for(let x=0;x<64;x++){const i=(y*64+x)*4,r=d[i]/255,gg=d[i+1]/255,b=d[i+2]/255;
+    const mx=Math.max(r,gg,b),mn=Math.min(r,gg,b),dl=mx-mn;let hh=0;
+    if(dl){if(mx===r)hh=((gg-b)/dl)%6;else if(mx===gg)hh=(b-r)/dl+2;else hh=(r-gg)/dl+4;hh=(hh*60+360)%360}
+    const s=mx?dl/mx:0;hist[Math.min(7,hh/45|0)*9+Math.min(2,s*3|0)*3+Math.min(2,mx*3|0)]++;
+    gray[(y>>2)*16+(x>>2)]+=(.299*r+.587*gg+.114*b)/16}
+  let m=0;gray.forEach(v=>m+=v);m/=gray.length;const gz=gray.map(v=>v-m);
+  const h2=l2(hist),g2=l2(gz);const out=new Float32Array(h2.length+g2.length);
+  out.set(h2.map(v=>v*.8));out.set(g2.map(v=>v*.6),h2.length);return l2(out);
+}
+
+/* ---------------- Modelo de IA ---------------- */
+const MODELS={dino:["Xenova/dinov2-small","onnx-community/dinov2-small"],clip:["Xenova/clip-vit-base-patch32"]};
+async function loadModel(key,onStatus){
+  if(key==="basic"){S.modelKey="basic";S.extractor=null;return"Básico"}
+  if(S.modelKey===key&&S.extractor)return S.model;
+  const T=await import("./lib/transformers.min.js");
+  T.env.allowLocalModels=false;
+  try{T.env.backends.onnx.wasm.wasmPaths=new URL("./lib/",location.href).href}catch(e){}
+  let lastErr;
+  for(const id of MODELS[key]){
+    try{
+      onStatus(`Descargando modelo ${id}…`);
+      const files={};
+      S.extractor=await T.pipeline("image-feature-extraction",id,{progress_callback:p=>{
+        if(p.status==="progress"&&p.total){files[p.file]=[p.loaded,p.total];let a=0,b=0;Object.values(files).forEach(([x,y])=>{a+=x;b+=y});onStatus(`Descargando modelo de IA: ${(a/1e6).toFixed(0)} de ${(b/1e6).toFixed(0)} MB`,a/b)}
+      }});
+      S.modelKey=key;S.model=id;return id;
+    }catch(e){lastErr=e;console.warn("Modelo falló",id,e)}
+  }
+  throw lastErr||new Error("No se pudo cargar el modelo");
+}
+async function embed(url){
+  if(S.modelKey==="basic")return basicFeat(url);
+  const t=await S.extractor(url);
+  const dims=t.dims,data=t.data;const d=dims[dims.length-1];
+  return l2(Array.from(data.slice(0,d))); // CLS (DINOv2) o embedding de imagen (CLIP)
+}
+
+/* ---------------- Referencia: carpetas ---------------- */
+function speciesFromPath(path){
+  const parts=path.split("/");const file=parts.pop();
+  let folder=parts.length>1?parts[parts.length-1]:"";
+  if(!folder){folder=file.replace(/\.[^.]+$/,"").replace(/[_-]\d+$/,"")}
+  return folder.replace(/^\s*\d+\s*[.)-]\s*/,"").trim()||folder;
+}
+async function addRefDir(files){
+  const imgs=[...files].filter(f=>IMG_RE.test(f.name)&&!f.name.startsWith("."));
+  if(!imgs.length){showMsg("#refMsg","warn","No encontré fotos en esa carpeta. Elige la carpeta que contiene las subcarpetas de cada especie.");return}
+  showMsg("#refMsg","info",`Leyendo ${imgs.length} fotos de referencia…`);
+  let bad=0;
+  for(const f of imgs){
+    const path=f.webkitRelativePath||f.name,label=speciesFromPath(path),key=norm(label);
+    if(!S.species.has(key))S.species.set(key,{key,label,off:false});
+    let thumb=null;try{thumb=await makeThumb(f)}catch(e){bad++;continue}
+    S.refs.push({id:uid(),species:key,file:f,path,source:"dir",thumb,emb:null});
+  }
+  showMsg("#refMsg",bad?"warn":"",bad?`${bad} fotos no se pudieron leer (¿formato HEIC?). Conviértelas a JPG si las necesitas.`:"");
+  invalidate();renderRef();
+}
+
+/* ---------------- Referencia: PDF ---------------- */
+function guessLabel(text){
+  const lines=text.split(/\n+/).map(s=>s.trim()).filter(s=>s.length>=2&&s.length<=70&&!/^\d+$/.test(s)&&!/^p[aá]g/i.test(s));
+  const code=lines.find(s=>/\b[A-Z]{1,6}[\s-]?\d{1,4}\b/.test(s));
+  const bin=lines.find(s=>/^[A-Z][a-z]+ (sp\.?\s?\d*|[a-z]{3,})/.test(s));
+  return(bin||code||lines[0]||"").slice(0,70);
+}
+const SKIP_RE=/cat[aá]logo|[ií]ndice|contenido|portada|tabla de|introducci/i;
+function objGet(page,name){return new Promise(res=>{const store=name.startsWith("g_")?page.commonObjs:page.objs;try{store.get(name,o=>res(o))}catch(e){res(null)}setTimeout(()=>res(null),4000)})}
+function imgObjToCanvas(o){
+  if(!o)return null;const c=document.createElement("canvas");c.width=o.width;c.height=o.height;const g=c.getContext("2d");
+  if(o.bitmap){g.drawImage(o.bitmap,0,0);return c}
+  if(!o.data)return null;const id=g.createImageData(o.width,o.height),d=id.data,src=o.data,n=o.width*o.height;
+  if(o.kind===3||src.length===n*4){d.set(src)}
+  else if(o.kind===2||src.length===n*3){for(let i=0,j=0;i<n;i++,j+=3){d[i*4]=src[j];d[i*4+1]=src[j+1];d[i*4+2]=src[j+2];d[i*4+3]=255}}
+  else if(o.kind===1){const rowB=(o.width+7)>>3;for(let y=0;y<o.height;y++)for(let x=0;x<o.width;x++){const bit=(src[y*rowB+(x>>3)]>>(7-(x&7)))&1,v=bit?255:0,k=(y*o.width+x)*4;d[k]=d[k+1]=d[k+2]=v;d[k+3]=255}}
+  else return null;
+  g.putImageData(id,0,0);return c;
+}
+async function pageImages(page){
+  const out=[];
+  try{
+    const ops=await page.getOperatorList(),O=pdfjsLib.OPS;
+    for(let i=0;i<ops.fnArray.length;i++){
+      const fn=ops.fnArray[i];
+      if(fn!==O.paintImageXObject&&fn!==O.paintJpegXObject)continue;
+      const name=ops.argsArray[i][0];if(typeof name!=="string")continue;
+      const c=imgObjToCanvas(await objGet(page,name));
+      if(c&&c.width>=80&&c.height>=80)out.push(c);
+    }
+  }catch(e){console.warn("Imágenes del PDF",e)}
+  return out;
+}
+async function addPdf(file){
+  if(!window.pdfjsLib){showMsg("#refMsg","err","No se pudo cargar el lector de PDF.");return}
+  showMsg("#refMsg","info",`Leyendo ${file.name}…`);
+  try{
+    const doc=await pdfjsLib.getDocument({data:await file.arrayBuffer()}).promise;
+    for(let p=1;p<=doc.numPages;p++){
+      const page=await doc.getPage(p);
+      const tc=await page.getTextContent();let text="";tc.items.forEach(it=>{text+=it.str+(it.hasEOL?"\n":" ")});
+      const label=guessLabel(text),skip=!label||SKIP_RE.test(label);
+      const imgs=await pageImages(page);
+      if(imgs.length){
+        for(let k=0;k<imgs.length;k++){
+          const ref={id:uid(),species:null,label,file,path:`${file.name} · pág. ${p}`+(imgs.length>1?` · img. ${k+1}`:""),source:"pdf",page:p,thumb:await makeThumb(imgs[k],448),emb:null,off:skip};
+          S.pdfPages.push(ref);S.refs.push(ref);
+        }
+      }else{
+        const vp0=page.getViewport({scale:1}),sc=1000/Math.max(vp0.width,vp0.height),vp=page.getViewport({scale:sc});
+        const c=document.createElement("canvas");c.width=vp.width;c.height=vp.height;
+        await page.render({canvasContext:c.getContext("2d"),viewport:vp}).promise;
+        const ref={id:uid(),species:null,label,file,path:`${file.name} · pág. ${p}`,source:"pdf",page:p,thumb:await makeThumb(c,700),emb:null,off:skip,whole:true};
+        S.pdfPages.push(ref);S.refs.push(ref);
+      }
+      showMsg("#refMsg","info",`Leyendo ${file.name}: página ${p} de ${doc.numPages}`);
+    }
+    showMsg("#refMsg","","");
+  }catch(e){console.error(e);showMsg("#refMsg","err",`No pude leer ${file.name}. ¿Está protegido o dañado?`)}
+  syncPdfSpecies();invalidate();renderRef();
+}
+function syncPdfSpecies(){
+  for(const r of S.pdfPages){
+    const label=(r.label||"").trim();
+    if(r.off||!label){r.species=null;continue}
+    const key=norm(label);r.species=key;
+    if(!S.species.has(key))S.species.set(key,{key,label,off:false});
+  }
+  // quitar especies que ya no tienen ninguna referencia
+  const used=new Set(S.refs.filter(r=>r.species).map(r=>r.species));
+  for(const k of [...S.species.keys()])if(!used.has(k))S.species.delete(k);
+}
+
+function activeRefs(){return S.refs.filter(r=>r.species&&!(r.source==="pdf"&&r.off)&&S.species.get(r.species)&&!S.species.get(r.species).off)}
+function renderRef(){
+  const sp=[...S.species.values()],act=activeRefs();
+  const nDir=S.refs.filter(r=>r.source==="dir").length,nPdf=S.pdfPages.length;
+  $("#refStats").innerHTML=S.refs.length?
+    `<div class="stat"><span class="eyebrow">Especies</span><b>${sp.filter(s=>!s.off).length}</b></div>
+     <div class="stat"><span class="eyebrow">Fotos de referencia</span><b>${nDir}</b></div>
+     ${nPdf?`<div class="stat"><span class="eyebrow">Imágenes PDF</span><b>${S.pdfPages.filter(p=>!p.off).length}/${nPdf}</b></div>`:""}`:"";
+  $("#btnRefClear").hidden=!S.refs.length;
+  $("#refSpeciesBox").hidden=!sp.length;
+  $("#refSpecies").innerHTML=sp.sort((a,b)=>a.label.localeCompare(b.label,"es",{numeric:true})).map(s=>{
+    const refs=S.refs.filter(r=>r.species===s.key),r0=refs[0];
+    return `<div class="sp ${s.off?"off":""}">${r0?`<img src="${r0.thumb}" alt="">`:""}<div class="t">
+      <input type="text" data-sp-label="${esc(s.key)}" value="${esc(s.label)}" aria-label="Nombre de la especie">
+      <label class="small muted" style="display:flex;gap:6px;align-items:center;margin-top:4px"><input type="checkbox" data-sp-on="${esc(s.key)}" ${s.off?"":"checked"}> ${refs.length} imagen${refs.length!==1?"es":""}</label></div></div>`}).join("");
+  $("#pdfBox").hidden=!nPdf;
+  $("#pdfPages").innerHTML=S.pdfPages.map(r=>`<div class="pg ${r.off?"off":""}"><img src="${r.thumb}" alt="Página ${r.page}">
+    <span class="small muted">${esc(r.path)}${r.whole?" (página completa)":""}</span>
+    <input type="text" data-pg-label="${r.id}" value="${esc(r.label||"")}" placeholder="Especie de esta imagen">
+    <label><input type="checkbox" data-pg-on="${r.id}" ${r.off?"":"checked"}> Usar esta imagen</label></div>`).join("");
+  updateRunBtn();
+}
+
+/* ---------------- Fotos por homologar ---------------- */
+function parseSampleFolder(name){const m=/^\s*(\d+)\s*[.)-]\s*(.+?)\s*$/.exec(name);return m?{num:+m[1],code:m[2]}:{num:null,code:name.trim()}}
+async function addProject(files){
+  const all=[...files];if(!all.length)return;
+  const root=(all[0].webkitRelativePath||"").split("/")[0]||"Proyecto";
+  const imgs=all.filter(f=>IMG_RE.test(f.name)&&!f.name.startsWith("."));
+  const xl=all.filter(f=>/\.xlsx$/i.test(f.name)&&!f.name.startsWith("~$")&&!/_homologado\.xlsx$/i.test(f.name));
+  const groups=new Map();
+  for(const f of imgs){
+    const parts=(f.webkitRelativePath||f.name).split("/");parts.pop();
+    let key,folder;
+    if(parts.length>=2){folder=parts[parts.length-1];key=parts.join("/")}
+    else{folder=f.name.replace(/\.[^.]+$/,"").replace(/[_-]\d+$/,"");key=root+"/"+folder}
+    if(!groups.has(key))groups.set(key,{folder,files:[]});groups.get(key).files.push(f);
+  }
+  const samples=[...groups.entries()].map(([key,g])=>{const p=parseSampleFolder(g.folder);
+    return{id:uid(),key,folder:g.folder,num:p.num,code:p.code,photos:g.files.sort((a,b)=>a.name.localeCompare(b.name,"es",{numeric:true})).map(f=>({file:f,path:f.webkitRelativePath||f.name,thumb:null,emb:null,err:null})),ranking:[],choice:null,state:"pendiente",manual:false}});
+  samples.sort((a,b)=>(a.num??1e9)-(b.num??1e9)||a.code.localeCompare(b.code,"es",{numeric:true}));
+  const prj={id:uid(),name:root,excel:xl.length===1?xl[0]:(xl.find(f=>norm(f.name).startsWith(norm(root)))||xl[0]||null),excelCandidates:xl,samples};
+  S.projects.push(prj);
+  for(const s of samples)for(const ph of s.photos){try{ph.thumb=await makeThumb(ph.file)}catch(e){ph.err="No se pudo leer"}}
+  invalidate();renderProjects();
+}
+function renderProjects(){
+  $("#projects").innerHTML=S.projects.map(p=>{
+    const n=p.samples.reduce((a,s)=>a+s.photos.length,0);
+    return `<div class="item"><div class="grow"><b>${esc(p.name)}</b><div class="small muted">${p.samples.length} muestras · ${n} fotos</div></div>
+      ${p.excel?`<span class="tag t-ok">Excel: ${esc(p.excel.name)}</span>`:`<span class="tag t-warn">Sin Excel: se creará uno nuevo</span>`}
+      <button class="btn btn-ghost sm" data-pick-xlsx="${p.id}">${p.excel?"Cambiar Excel":"Elegir Excel"}</button>
+      <button class="btn btn-danger sm" data-rm-prj="${p.id}">Quitar</button></div>`}).join("")||`<p class="empty">Aún no has agregado carpetas.</p>`;
+  updateRunBtn();
+}
+function updateRunBtn(){$("#btnRun").disabled=!(activeRefs().length&&S.projects.some(p=>p.samples.length))}
+function invalidate(){
+  if(S.analyzed){S.analyzed=false;$("#resPanel").hidden=true;$("#dlPanel").hidden=true;showMsg("#runMsg","info","Cambiaste la referencia o las fotos. Vuelve a tocar Comparar fotos.")}
+}
+
+/* ---------------- Comparar ---------------- */
+function setProg(frac,txt){$("#runBox").hidden=false;$("#prog").style.width=Math.round((frac||0)*100)+"%";$("#progTxt").textContent=txt}
+async function run(){
+  const key=$("#model").value,btn=$("#btnRun");btn.disabled=true;showMsg("#runMsg","","");
+  try{
+    if(S.modelKey!==key){S.refs.forEach(r=>r.emb=null);S.projects.forEach(p=>p.samples.forEach(s=>s.photos.forEach(ph=>ph.emb=null)))}
+    setProg(0,"Preparando…");
+    let used;
+    try{used=await loadModel(key,(t,f)=>setProg(f||0,t))}
+    catch(e){console.error(e);showMsg("#runMsg","err","No se pudo descargar el modelo de IA. Revisa tu conexión a internet e inténtalo de nuevo, o usa el método Básico sin IA.");btn.disabled=false;$("#runBox").hidden=true;return}
+    const refs=activeRefs().filter(r=>!r.emb);
+    const photos=[];S.projects.forEach(p=>p.samples.forEach(s=>s.photos.forEach(ph=>{if(!ph.emb&&ph.thumb)photos.push(ph)})));
+    const total=refs.length+photos.length;let done=0;const t0=performance.now();
+    const tick=label=>{done++;const el=(performance.now()-t0)/1000,rest=done?el/done*(total-done):0;setProg(done/total,`${label} ${done} de ${total}${rest>5?` · faltan ~${rest>90?Math.round(rest/60)+" min":Math.round(rest)+" s"}`:""}`)};
+    for(const r of refs){try{r.emb=await embed(r.thumb)}catch(e){console.warn(e)}tick("Analizando fotos:")}
+    for(const ph of photos){try{ph.emb=await embed(ph.thumb)}catch(e){ph.err="Error al analizar";console.warn(e)}tick("Analizando fotos:")}
+    rank();S.analyzed=true;
+    setProg(1,`Listo. Método: ${used}.`);
+    $("#resPanel").hidden=false;$("#dlPanel").hidden=false;syncSliders();applyStates();renderResults();renderDl();
+    $("#resPanel").scrollIntoView({behavior:matchMedia("(prefers-reduced-motion: reduce)").matches?"auto":"smooth",block:"start"});
+  }catch(e){console.error(e);showMsg("#runMsg","err","Algo falló durante la comparación: "+(e.message||e))}
+  btn.disabled=false;
+}
+function rank(){
+  const refs=activeRefs().filter(r=>r.emb);const bySp=new Map();
+  refs.forEach(r=>{if(!bySp.has(r.species))bySp.set(r.species,[]);bySp.get(r.species).push(r)});
+  for(const p of S.projects)for(const s of p.samples){
+    const qs=s.photos.filter(ph=>ph.emb);
+    if(!qs.length){s.ranking=[];continue}
+    const res=[];
+    for(const [sp,rs] of bySp){
+      let sum=0,best=-2,bestRef=null;
+      for(const q of qs){let m=-2,mr=null;for(const r of rs){const c=cos(q.emb,r.emb);if(c>m){m=c;mr=r}}sum+=m;if(m>best){best=m;bestRef=mr}}
+      res.push({species:sp,score:sum/qs.length,ref:bestRef});
+    }
+    res.sort((a,b)=>b.score-a.score);s.ranking=res;
+  }
+}
+const pct=x=>Math.max(0,x*100);
+function th(){return S.th[S.modelKey||"dino"]}
+function applyStates(){
+  const t=th();
+  for(const p of S.projects)for(const s of p.samples){
+    if(s.manual)continue;
+    const a=s.ranking[0],b=s.ranking[1];
+    if(!a){s.state="pendiente";s.choice=null;continue}
+    const top=pct(a.score),margin=b?top-pct(b.score):100;
+    if(top>=t.hi&&margin>=t.mg){s.state="auto";s.choice=a.species}
+    else if(top>=t.lo){s.state="revisar";s.choice=a.species}
+    else{s.state="pendiente";s.choice=null}
+  }
+}
+
+/* ---------------- Resultados ---------------- */
+const STATE_TXT={auto:["Homologada","t-ok"],confirmada:["Confirmada","t-ok"],revisar:["Revisar","t-warn"],pendiente:["Pendiente","t-bad"]};
+function allSamples(){const out=[];S.projects.forEach(p=>p.samples.forEach(s=>out.push([p,s])));return out}
+function spLabel(k){const s=S.species.get(k);return s?s.label:k}
+function renderResults(){
+  const all=allSamples(),c={todas:all.length,auto:0,confirmada:0,revisar:0,pendiente:0};all.forEach(([,s])=>c[s.state]++);
+  $("#resStats").innerHTML=`<div class="stat"><span class="eyebrow">Muestras</span><b>${c.todas}</b></div>
+    <div class="stat"><span class="eyebrow">Homologadas</span><b>${c.auto+c.confirmada}</b></div>
+    <div class="stat"><span class="eyebrow">Por revisar</span><b>${c.revisar}</b></div>
+    <div class="stat"><span class="eyebrow">Pendientes</span><b>${c.pendiente}</b></div>`;
+  const F=[["todas","Todas",c.todas],["revisar","Revisar",c.revisar],["pendiente","Pendientes",c.pendiente],["ok","Homologadas",c.auto+c.confirmada]];
+  $("#filters").innerHTML=F.map(([k,l,n])=>`<button class="chip" data-filter="${k}" aria-pressed="${S.filter===k}">${l} · ${n}</button>`).join("");
+  const vis=all.filter(([,s])=>S.filter==="todas"||(S.filter==="ok"?(s.state==="auto"||s.state==="confirmada"):s.state===S.filter));
+  const multi=S.projects.length>1;
+  const opts=[...S.species.values()].filter(s=>!s.off).sort((a,b)=>a.label.localeCompare(b.label,"es",{numeric:true}));
+  $("#cards").innerHTML=vis.length?vis.map(([p,s])=>{
+    const [txt,cls]=STATE_TXT[s.state];
+    const top=s.ranking.slice(0,3);
+    return `<article class="card s-${s.state==="confirmada"?"auto":s.state}" data-sid="${s.id}">
+      <div class="card-h"><div style="min-width:0"><div class="nm">${esc(s.folder)}</div><div class="small muted">${multi?esc(p.name)+" · ":""}${s.photos.length} foto${s.photos.length!==1?"s":""}</div></div><span class="tag ${cls}">${txt}</span></div>
+      <div class="photos">${s.photos.slice(0,6).map(ph=>ph.thumb?`<img src="${ph.thumb}" alt="${esc(ph.file.name)}" title="${esc(ph.path)}">`:`<span class="tag t-bad">${esc(ph.file.name)}: ${esc(ph.err||"")}</span>`).join("")}</div>
+      <div class="cands">${top.length?top.map(r=>`<button class="cand" data-pick="${s.id}" data-sp="${esc(r.species)}" aria-pressed="${s.choice===r.species}">
+          ${r.ref?`<img src="${r.ref.thumb}" alt="" title="${esc(r.ref.path)}">`:""}
+          <span class="t"><b>${esc(spLabel(r.species))}</b><span class="bar"><i style="width:${Math.min(100,pct(r.score)).toFixed(0)}%"></i></span></span>
+          <span class="pct">${pct(r.score).toFixed(1)}%</span></button>`).join(""):`<p class="small muted">No se pudo analizar ninguna foto de esta muestra.</p>`}</div>
+      <div class="card-f">
+        <select data-other="${s.id}" aria-label="Elegir otra especie"><option value="">Otra especie…</option>${opts.map(o=>`<option value="${esc(o.key)}" ${s.choice===o.key&&!top.some(r=>r.species===o.key)?"selected":""}>${esc(o.label)}</option>`).join("")}</select>
+        <button class="btn btn-ghost sm" data-pend="${s.id}">Dejar pendiente</button>
+      </div></article>`}).join(""):`<p class="empty">No hay muestras en este filtro.</p>`;
+}
+function findSample(id){for(const p of S.projects)for(const s of p.samples)if(s.id===id)return s}
+function setChoice(s,sp){s.manual=true;if(sp){s.choice=sp;s.state="confirmada"}else{s.choice=null;s.state="pendiente"}renderResults();renderDl()}
+function syncSliders(){const t=th();$("#thHi").value=t.hi;$("#thLo").value=t.lo;$("#thMg").value=t.mg;$("#oHi").textContent=t.hi+"%";$("#oLo").textContent=t.lo+"%";$("#oMg").textContent=t.mg+" pts"}
+["thHi","thLo","thMg"].forEach(id=>$("#"+id).addEventListener("input",()=>{
+  const t=th();t.hi=+$("#thHi").value;t.lo=Math.min(+$("#thLo").value,t.hi);t.mg=+$("#thMg").value;syncSliders();applyStates();renderResults();renderDl()}));
+
+/* ---------------- Excel ---------------- */
+function renderDl(){
+  $("#dlList").innerHTML=S.projects.map(p=>{
+    const ok=p.samples.filter(s=>s.choice).length,pend=p.samples.length-ok,rev=p.samples.filter(s=>s.state==="revisar").length;
+    return `<div class="dl"><div class="grow"><b>${esc(p.name)}</b><div class="small muted">${ok} con especie · ${pend} pendientes${rev?` · ${rev} sin revisar (se escriben como "Revisar")`:""}</div></div>
+      <button class="btn btn-primary" data-dl="${p.id}">Descargar ${esc(excelOutName(p))}</button></div>`}).join("");
+}
+function excelOutName(p){return(p.excel?p.excel.name.replace(/\.xlsx$/i,""):p.name)+"_homologado.xlsx"}
+const COLS=["ESPECIE HOMOLOGADA","SIMILITUD %","ESTADO","REFERENCIA"];
+function cellText(c){const v=c.value;if(v==null)return"";if(typeof v==="object"){if(v.richText)return v.richText.map(t=>t.text).join("");if(v.text!=null)return String(v.text);if(v.result!=null)return String(v.result)}return String(v)}
+function sampleResult(s){
+  const r=s.ranking.find(x=>x.species===s.choice);
+  const estado=s.choice?(s.state==="revisar"?"Revisar":s.state==="confirmada"?"Confirmada":"Homologada"):"Pendiente";
+  return{especie:s.choice?spLabel(s.choice):"PENDIENTE",sim:r?Math.round(pct(r.score)*10)/10:null,estado,ref:r&&r.ref?r.ref.path:""};
+}
+async function buildExcel(p){
+  const wb=new ExcelJS.Workbook();let ws=null,hRow=0,codeCol=0,numCol=0;
+  if(p.excel){
+    await wb.xlsx.load(await p.excel.arrayBuffer());
+    outer:for(const w of wb.worksheets){if(w.name==="Homologación")continue;for(let r=1;r<=Math.min(20,w.rowCount);r++){const row=w.getRow(r);let cc=0,nc=0;
+      row.eachCell((c,col)=>{const t=norm(cellText(c));if(["CODIGO","COD","COD.","MORFO","MORFOESPECIE","CODIGO MORFO"].includes(t))cc=col;if(["MUESTRAS","MUESTRA","N° MUESTRA","NO. MUESTRA","NUMERO DE MUESTRA"].includes(t))nc=col});
+      if(cc){ws=w;hRow=r;codeCol=cc;numCol=nc;break outer}}}
+  }
+  if(!ws){
+    ws=wb.addWorksheet("Muestras");hRow=1;numCol=1;codeCol=2;
+    ws.addRow(["MUESTRAS","CÓDIGO","FOTO INICIAL","FOTO FINAL","OBSER"]);
+    p.samples.forEach(s=>{const n=s.photos.map(ph=>ph.file.name.replace(/\.[^.]+$/,""));ws.addRow([s.num??"",s.code,n[0]||"",n[n.length-1]||"",""])});
+    ws.getRow(1).font={bold:true};[12,14,16,16,30].forEach((w,i)=>ws.getColumn(i+1).width=w);
+  }
+  // columnas destino (reutiliza si ya existen)
+  const head=ws.getRow(hRow);let maxCol=0;const existing={};
+  head.eachCell((c,col)=>{if(cellText(c).trim())maxCol=Math.max(maxCol,col);const t=norm(cellText(c));COLS.forEach(n=>{if(t===norm(n))existing[n]=col})});
+  const colOf={};let nextCol=maxCol+1;COLS.forEach(n=>{colOf[n]=existing[n]||nextCol++});
+  const hStyle=head.getCell(codeCol).style;
+  COLS.forEach((n,i)=>{const c=head.getCell(colOf[n]);c.value=n;c.style=JSON.parse(JSON.stringify(hStyle||{}));const col=ws.getColumn(colOf[n]);if(!existing[n])col.width=[28,13,14,34][i]});
+  const byCode=new Map(),byNum=new Map();p.samples.forEach(s=>{byCode.set(norm(s.code),s);if(s.num!=null)byNum.set(s.num,s)});
+  const seen=new Set();let lastRow=ws.rowCount;
+  for(let r=hRow+1;r<=lastRow;r++){
+    const row=ws.getRow(r),code=norm(cellText(row.getCell(codeCol)));
+    if(!code)continue;
+    let s=byCode.get(code);
+    if(!s&&numCol){const n=parseInt(cellText(row.getCell(numCol)),10);const cand=byNum.get(n);if(cand&&norm(cand.code)===code)s=cand}
+    const dStyle=JSON.parse(JSON.stringify(row.getCell(codeCol).style||{}));
+    const put=(n,v)=>{const c=row.getCell(colOf[n]);c.value=v;c.style=dStyle};
+    if(!s){put("ESPECIE HOMOLOGADA","");put("SIMILITUD %",null);put("ESTADO","Sin fotos");put("REFERENCIA","");continue}
+    seen.add(s.id);const res=sampleResult(s);
+    put("ESPECIE HOMOLOGADA",res.especie);put("SIMILITUD %",res.sim);put("ESTADO",res.estado);put("REFERENCIA",res.ref);
+    row.commit&&row.commit();
+  }
+  // hoja de trazabilidad
+  const old=wb.getWorksheet("Homologación");if(old)wb.removeWorksheet(old.id);
+  const tw=wb.addWorksheet("Homologación");
+  tw.addRow(["PROYECTO","CARPETA","MUESTRA","CÓDIGO","FOTO","RUTA ORIGINAL","ESPECIE ASIGNADA","ESTADO","SIMILITUD %","REFERENCIA","OPCIÓN 2","% 2","OPCIÓN 3","% 3","EN EXCEL"]);
+  tw.getRow(1).font={bold:true};tw.views=[{state:"frozen",ySplit:1}];
+  [12,16,9,12,18,40,26,12,11,34,24,8,24,8,10].forEach((w,i)=>tw.getColumn(i+1).width=w);
+  for(const s of p.samples){const res=sampleResult(s),r2=s.ranking[1],r3=s.ranking[2];
+    for(const ph of s.photos)tw.addRow([p.name,s.folder,s.num??"",s.code,ph.file.name,ph.path,res.especie,res.estado,res.sim,res.ref,r2?spLabel(r2.species):"",r2?Math.round(pct(r2.score)*10)/10:"",r3?spLabel(r3.species):"",r3?Math.round(pct(r3.score)*10)/10:"",seen.has(s.id)?"Sí":"No"])}
+  const buf=await wb.xlsx.writeBuffer();
+  return{blob:new Blob([buf],{type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"}),missing:p.samples.filter(s=>!seen.has(s.id)).length};
+}
+async function download(p,btn){
+  const old=btn.textContent;btn.disabled=true;btn.textContent="Generando…";
+  try{const {blob,missing}=await buildExcel(p);const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download=excelOutName(p);document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},5000);
+    if(missing&&p.excel)alertBox(`${missing} muestra${missing>1?"s":""} de las carpetas no aparece${missing>1?"n":""} en el Excel. Quedaron registradas en la hoja "Homologación" (columna EN EXCEL = No).`)}
+  catch(e){console.error(e);alertBox("No pude generar el Excel: "+(e.message||e))}
+  btn.disabled=false;btn.textContent=old;
+}
+function alertBox(t){showMsg("#runMsg","warn",t);$("#dlList").insertAdjacentHTML("afterbegin",`<div class="msg warn">${esc(t)}</div>`)}
+function showMsg(sel,kind,text){const el=$(sel);el.className=kind?"msg "+kind:"";el.textContent=text||"";el.hidden=!text}
+
+/* ---------------- Eventos ---------------- */
+let xlsxTarget=null;
+$("#btnRefDir").onclick=()=>{$("#inRefDir").value="";$("#inRefDir").click()};
+$("#btnRefPdf").onclick=()=>{$("#inRefPdf").value="";$("#inRefPdf").click()};
+$("#btnQDir").onclick=()=>{$("#inQDir").value="";$("#inQDir").click()};
+$("#inRefDir").addEventListener("change",e=>addRefDir(e.target.files));
+$("#inRefPdf").addEventListener("change",async e=>{for(const f of e.target.files)await addPdf(f)});
+$("#inQDir").addEventListener("change",e=>addProject(e.target.files));
+$("#inQXlsx").addEventListener("change",e=>{const f=e.target.files[0],p=S.projects.find(x=>x.id===xlsxTarget);if(f&&p){p.excel=f;renderProjects();if(S.analyzed)renderDl()}});
+$("#btnRefClear").onclick=()=>{S.refs=[];S.pdfPages=[];S.species.clear();invalidate();renderRef()};
+$("#btnRun").onclick=run;
+document.addEventListener("click",e=>{
+  const b=e.target.closest("button");if(!b)return;
+  if(b.dataset.pickXlsx){xlsxTarget=b.dataset.pickXlsx;$("#inQXlsx").value="";$("#inQXlsx").click()}
+  else if(b.dataset.rmPrj){S.projects=S.projects.filter(p=>p.id!==b.dataset.rmPrj);invalidate();renderProjects()}
+  else if(b.dataset.filter){S.filter=b.dataset.filter;renderResults()}
+  else if(b.dataset.pick){const s=findSample(b.dataset.pick);if(s)setChoice(s,b.dataset.sp)}
+  else if(b.dataset.pend){const s=findSample(b.dataset.pend);if(s)setChoice(s,null)}
+  else if(b.dataset.dl){const p=S.projects.find(x=>x.id===b.dataset.dl);if(p)download(p,b)}
+});
+document.addEventListener("change",e=>{
+  const t=e.target;
+  if(t.dataset.other!==undefined&&t.dataset.other){const s=findSample(t.dataset.other);if(s&&t.value)setChoice(s,t.value)}
+  else if(t.dataset.spOn){const s=S.species.get(t.dataset.spOn);if(s){s.off=!t.checked;invalidate();renderRef()}}
+  else if(t.dataset.spLabel){const s=S.species.get(t.dataset.spLabel);if(s){s.label=t.value.trim()||s.label;if(S.analyzed){renderResults();renderDl()}}}
+  else if(t.dataset.pgOn){const r=S.refs.find(x=>x.id===t.dataset.pgOn);if(r){r.off=!t.checked;syncPdfSpecies();invalidate();renderRef()}}
+  else if(t.dataset.pgLabel){const r=S.refs.find(x=>x.id===t.dataset.pgLabel);if(r){r.label=t.value.trim();if(r.label)r.off=false;syncPdfSpecies();invalidate();renderRef()}}
+});
+renderRef();renderProjects();
+})();
+</script>
+</body>
+</html>
