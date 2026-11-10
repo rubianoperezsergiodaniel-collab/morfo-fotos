@@ -109,7 +109,7 @@ input[type=range]{width:100%;accent-color:var(--accent)}
   <!-- PASO 1 -->
   <section class="panel">
     <h2><span class="step">1</span>Referencia</h2>
-    <p class="small muted">Elige la carpeta con las fotos de referencia. Cada subcarpeta es una especie y su nombre es el que se escribirá en el Excel. Puedes agregar también el PDF de referencia.</p>
+    <p class="small muted">Elige la carpeta con las fotos de referencia. El nombre de cada foto es la especie que se escribirá en el Excel (por ejemplo <span class="mono">Graphis scripta.jpeg</span>). Si tienes varias fotos de la misma especie (<span class="mono">Graphis scripta (2).jpeg</span>), se agrupan solas. Agrega también el PDF de referencia.</p>
     <div class="row">
       <button class="btn btn-primary" id="btnRefDir">Elegir carpeta de referencia</button>
       <button class="btn btn-ghost" id="btnRefPdf">Agregar PDF</button>
@@ -274,11 +274,15 @@ async function embed(url){
 }
 
 /* ---------------- Referencia: carpetas ---------------- */
+/* La especie sale del nombre de la foto: "Graphis scripta .jpeg" -> "Graphis scripta".
+   Se quitan numeraciones de copias ("Graphis scripta (2)", "Graphis scripta_3", "Graphis scripta 2"),
+   pero se respeta "Graphis sp. 2". */
+const spKey=l=>norm(l).replace(/\./g,"").replace(/\s+/g," ").trim();
 function speciesFromPath(path){
-  const parts=path.split("/");const file=parts.pop();
-  let folder=parts.length>1?parts[parts.length-1]:"";
-  if(!folder){folder=file.replace(/\.[^.]+$/,"").replace(/[_-]\d+$/,"")}
-  return folder.replace(/^\s*\d+\s*[.)-]\s*/,"").trim()||folder;
+  let n=path.split("/").pop().replace(/\.[^.]+$/,"").replace(/[_]+/g," ").replace(/\s+/g," ").trim();
+  n=n.replace(/\s*-?\s*copia(\s*\(?\d+\)?)?$/i,"").replace(/\s*\(\d+\)$/,"").replace(/\s*-\s*\d+$/,"").trim();
+  if(!/\bsp\.?\s*\d+$/i.test(n))n=n.replace(/\s+\d+$/,"").trim();
+  return n||path.split("/").pop();
 }
 async function addRefDir(files){
   const imgs=[...files].filter(f=>IMG_RE.test(f.name)&&!f.name.startsWith("."));
@@ -286,7 +290,7 @@ async function addRefDir(files){
   showMsg("#refMsg","info",`Leyendo ${imgs.length} fotos de referencia…`);
   let bad=0;
   for(const f of imgs){
-    const path=f.webkitRelativePath||f.name,label=speciesFromPath(path),key=norm(label);
+    const path=f.webkitRelativePath||f.name,label=speciesFromPath(path),key=spKey(label);
     if(!S.species.has(key))S.species.set(key,{key,label,off:false});
     let thumb=null;try{thumb=await makeThumb(f)}catch(e){bad++;continue}
     S.refs.push({id:uid(),species:key,file:f,path,source:"dir",thumb,emb:null});
@@ -397,7 +401,7 @@ function syncPdfSpecies(){
   for(const r of S.pdfPages){
     const label=(r.label||"").trim();
     if(r.off||!label){r.species=null;continue}
-    const key=norm(label);r.species=key;
+    const key=spKey(label);r.species=key;
     if(!S.species.has(key))S.species.set(key,{key,label,off:false});
   }
   // quitar especies que ya no tienen ninguna referencia
@@ -419,7 +423,7 @@ function renderRef(){
     const refs=S.refs.filter(r=>r.species===s.key),r0=refs[0];
     return `<div class="sp ${s.off?"off":""}">${r0?`<img src="${r0.thumb}" alt="">`:""}<div class="t">
       <input type="text" data-sp-label="${esc(s.key)}" value="${esc(s.label)}" aria-label="Nombre de la especie">
-      <label class="small muted" style="display:flex;gap:6px;align-items:center;margin-top:4px"><input type="checkbox" data-sp-on="${esc(s.key)}" ${s.off?"":"checked"}> ${refs.length} imagen${refs.length!==1?"es":""}</label></div></div>`}).join("");
+      <label class="small muted" style="display:flex;gap:6px;align-items:center;margin-top:4px"><input type="checkbox" data-sp-on="${esc(s.key)}" ${s.off?"":"checked"}> ${refs.length} ${refs.length!==1?"imágenes":"imagen"}</label></div></div>`}).join("");
   $("#pdfBox").hidden=!nPdf;
   $("#pdfPages").innerHTML=S.pdfPages.map(r=>`<div class="pg ${r.off?"off":""}"><img src="${r.thumb}" alt="Página ${r.page}">
     <span class="small muted">${esc(r.path)}</span>${r.caption?`<span class="small muted" style="font-size:.72rem;line-height:1.25" title="${esc(r.caption)}">${esc(r.caption.slice(0,110))}${r.caption.length>110?"…":""}</span>`:""}
