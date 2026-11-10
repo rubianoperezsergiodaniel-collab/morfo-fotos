@@ -125,7 +125,7 @@ input[type=range]{width:100%;accent-color:var(--accent)}
     </details>
     <details id="pdfBox" hidden open>
       <summary>Imágenes del PDF: revisa la especie de cada una</summary>
-      <p class="small muted" style="margin-bottom:10px">Saqué cada foto del PDF y le puse como nombre el texto de su página. Corrígelo si hace falta y desmarca lo que no sea una especie (portada, índice, logos). Si una página no tiene fotos sueltas, se usa la página completa.</p>
+      <p class="small muted" style="margin-bottom:10px">Leo el PDF desde el título "Especies no vasculares en veda". De cada foto tomo el nombre científico de su leyenda (sin autor ni coordenadas). Corrígelo si hace falta y desmarca lo que no sea una especie.</p>
       <div class="pdfpages" id="pdfPages"></div>
     </details>
   </section>
@@ -296,13 +296,6 @@ async function addRefDir(files){
 }
 
 /* ---------------- Referencia: PDF ---------------- */
-function guessLabel(text){
-  const lines=text.split(/\n+/).map(s=>s.trim()).filter(s=>s.length>=2&&s.length<=70&&!/^\d+$/.test(s)&&!/^p[aá]g/i.test(s));
-  const code=lines.find(s=>/\b[A-Z]{1,6}[\s-]?\d{1,4}\b/.test(s));
-  const bin=lines.find(s=>/^[A-Z][a-z]+ (sp\.?\s?\d*|[a-z]{3,})/.test(s));
-  return(bin||code||lines[0]||"").slice(0,70);
-}
-const SKIP_RE=/cat[aá]logo|[ií]ndice|contenido|portada|tabla de|introducci/i;
 function objGet(page,name){return new Promise(res=>{const store=name.startsWith("g_")?page.commonObjs:page.objs;try{store.get(name,o=>res(o))}catch(e){res(null)}setTimeout(()=>res(null),4000)})}
 function imgObjToCanvas(o){
   if(!o)return null;const c=document.createElement("canvas");c.width=o.width;c.height=o.height;const g=c.getContext("2d");
@@ -314,45 +307,89 @@ function imgObjToCanvas(o){
   else return null;
   g.putImageData(id,0,0);return c;
 }
+/* Lee el nombre científico de la leyenda: "Fotografía …-55. Allographa chlorocarpa (Fée) Lücking & Kalb." */
+const BIN="([A-Z][a-zäëïöüéá]+(?:\\s+(?:cf\\.|aff\\.))?\\s+(?:[a-z][a-zäëïöüéá-]{2,}|sp\\.?(?:\\s*\\d+)?)(?:\\s+(?:var\\.|subsp\\.|f\\.)\\s+[a-z-]{3,})?)";
+const NOT_GENUS=/^(No|El|La|Los|Las|Un|Una|En|De|Del|Se|Por|Para|Con|Fuente|Fotograf\S*|Coordenadas|Error|Figura|Tabla|Imagen|Foto|Especie\S*|Familia)$/;
+function parseSpecies(t){
+  t=String(t||"").replace(/\s+/g," ");
+  let m=new RegExp("\\d\\s*\\.\\s*"+BIN).exec(t.replace(/Coordenadas.*/i,""));
+  if(m&&!NOT_GENUS.test(m[1].split(" ")[0]))return m[1].trim();
+  const re=new RegExp(BIN,"g");let x;
+  while((x=re.exec(t))){if(!NOT_GENUS.test(x[1].split(" ")[0]))return x[1].trim()}
+  return "";
+}
+const mul=(m,n)=>[m[0]*n[0]+m[2]*n[1],m[1]*n[0]+m[3]*n[1],m[0]*n[2]+m[2]*n[3],m[1]*n[2]+m[3]*n[3],m[0]*n[4]+m[2]*n[5]+m[4],m[1]*n[4]+m[3]*n[5]+m[5]];
 async function pageImages(page){
   const out=[];
   try{
     const ops=await page.getOperatorList(),O=pdfjsLib.OPS;
+    let ctm=[1,0,0,1,0,0];const stack=[];
     for(let i=0;i<ops.fnArray.length;i++){
-      const fn=ops.fnArray[i];
-      if(fn!==O.paintImageXObject&&fn!==O.paintJpegXObject)continue;
-      const name=ops.argsArray[i][0];if(typeof name!=="string")continue;
-      const c=imgObjToCanvas(await objGet(page,name));
-      if(c&&c.width>=80&&c.height>=80)out.push(c);
+      const fn=ops.fnArray[i],args=ops.argsArray[i];
+      if(fn===O.save)stack.push(ctm);
+      else if(fn===O.restore)ctm=stack.pop()||[1,0,0,1,0,0];
+      else if(fn===O.transform)ctm=mul(ctm,args);
+      else if(fn===O.paintFormXObjectBegin){stack.push(ctm);if(Array.isArray(args[0])&&args[0].length===6)ctm=mul(ctm,args[0])}
+      else if(fn===O.paintFormXObjectEnd)ctm=stack.pop()||[1,0,0,1,0,0];
+      else if(fn===O.paintImageXObject||fn===O.paintJpegXObject){
+        const name=args[0];if(typeof name!=="string")continue;
+        const c=imgObjToCanvas(await objGet(page,name));
+        if(!c||c.width<80||c.height<80)continue;
+        const pts=[[0,0],[1,0],[0,1],[1,1]].map(([x,y])=>[ctm[0]*x+ctm[2]*y+ctm[4],ctm[1]*x+ctm[3]*y+ctm[5]]);
+        const xs=pts.map(p=>p[0]),ys=pts.map(p=>p[1]);
+        const box={x0:Math.min(...xs),x1:Math.max(...xs),y0:Math.min(...ys),y1:Math.max(...ys)};
+        if((box.x1-box.x0)<40||(box.y1-box.y0)<40)continue; // logos e íconos
+        out.push({canvas:c,box});
+      }
     }
   }catch(e){console.warn("Imágenes del PDF",e)}
   return out;
 }
+function captionFor(img,imgs,items){
+  const {x0,x1,y0,y1}=img.box,h=y1-y0;
+  let floor=y0-170;
+  imgs.forEach(o=>{if(o!==img&&o.box.y1<=y0+5&&o.box.x1>x0&&o.box.x0<x1)floor=Math.max(floor,o.box.y1)});
+  const sel=items.filter(it=>{const x=it.transform[4],y=it.transform[5],xc=x+(it.width||0)/2;
+    return y>=floor&&y<=y0+h*.45&&xc>=x0-40&&xc<=x1+40});
+  sel.sort((a,b)=>(b.transform[5]-a.transform[5])||(a.transform[4]-b.transform[4]));
+  let txt="",lastY=null;sel.forEach(it=>{const y=it.transform[5];txt+=(lastY!==null&&Math.abs(y-lastY)>2?" ":"")+it.str;lastY=y});
+  return txt;
+}
+const START_RE=/ESPECIES NO VASCULARES EN VEDA/;
 async function addPdf(file){
   if(!window.pdfjsLib){showMsg("#refMsg","err","No se pudo cargar el lector de PDF.");return}
   showMsg("#refMsg","info",`Leyendo ${file.name}…`);
   try{
     const doc=await pdfjsLib.getDocument({data:await file.arrayBuffer()}).promise;
-    for(let p=1;p<=doc.numPages;p++){
-      const page=await doc.getPage(p);
-      const tc=await page.getTextContent();let text="";tc.items.forEach(it=>{text+=it.str+(it.hasEOL?"\n":" ")});
-      const label=guessLabel(text),skip=!label||SKIP_RE.test(label);
-      const imgs=await pageImages(page);
-      if(imgs.length){
+    const texts=[];
+    for(let p=1;p<=doc.numPages;p++){const pg=await doc.getPage(p);const tc=await pg.getTextContent();texts.push(tc.items);
+      if(p%10===0)showMsg("#refMsg","info",`Buscando "Especies no vasculares en veda" en ${file.name}: página ${p} de ${doc.numPages}`)}
+    // saltar el índice: si el título aparece varias veces, usar la aparición que tiene fotos después
+    const hits=[];texts.forEach((items,i)=>{const t=norm(items.map(x=>x.str).join(" "));
+      const isIndex=/\.{5,}|…{2,}|TABLA DE CONTENIDO|^\s*CONTENIDO|INDICE/.test(t);
+      if(START_RE.test(t)&&!isIndex)hits.push(i+1)});
+    let found=hits.length>0;
+    let added=0,noName=0;
+    for(const h of (found?hits:[1])){
+      added=0;noName=0;
+      for(let p=h;p<=doc.numPages;p++){
+        const page=await doc.getPage(p),items=texts[p-1];
+        const imgs=await pageImages(page);
         for(let k=0;k<imgs.length;k++){
-          const ref={id:uid(),species:null,label,file,path:`${file.name} · pág. ${p}`+(imgs.length>1?` · img. ${k+1}`:""),source:"pdf",page:p,thumb:await makeThumb(imgs[k],448),emb:null,off:skip};
-          S.pdfPages.push(ref);S.refs.push(ref);
+          const cap=captionFor(imgs[k],imgs,items),label=parseSpecies(cap);
+          if(!label)noName++;
+          const ref={id:uid(),species:null,label,caption:cap,file,path:`${file.name} · pág. ${p}`+(imgs.length>1?` · foto ${k+1}`:""),source:"pdf",page:p,thumb:await makeThumb(imgs[k].canvas,448),emb:null,off:!label};
+          S.pdfPages.push(ref);S.refs.push(ref);added++;
         }
-      }else{
-        const vp0=page.getViewport({scale:1}),sc=1000/Math.max(vp0.width,vp0.height),vp=page.getViewport({scale:sc});
-        const c=document.createElement("canvas");c.width=vp.width;c.height=vp.height;
-        await page.render({canvasContext:c.getContext("2d"),viewport:vp}).promise;
-        const ref={id:uid(),species:null,label,file,path:`${file.name} · pág. ${p}`,source:"pdf",page:p,thumb:await makeThumb(c,700),emb:null,off:skip,whole:true};
-        S.pdfPages.push(ref);S.refs.push(ref);
+        showMsg("#refMsg","info",`Leyendo fotos de ${file.name}: página ${p} de ${doc.numPages}`);
       }
-      showMsg("#refMsg","info",`Leyendo ${file.name}: página ${p} de ${doc.numPages}`);
+      if(added)break; // la primera aparición con fotos es la sección real
     }
-    showMsg("#refMsg","","");
+    const parts=[];
+    if(!found)parts.push(`No encontré el título "Especies no vasculares en veda" en ${file.name}; revisé todo el documento.`);
+    else parts.push(`${file.name}: leí desde la página ${hits[0]}${hits.length>1?" (sección con fotos)":""}.`);
+    parts.push(`${added} fotos encontradas`+(noName?`, ${noName} sin nombre legible (quedaron desmarcadas; escríbelo a mano si la necesitas).`:"."));
+    showMsg("#refMsg",noName||!found?"warn":"info",parts.join(" "));
   }catch(e){console.error(e);showMsg("#refMsg","err",`No pude leer ${file.name}. ¿Está protegido o dañado?`)}
   syncPdfSpecies();invalidate();renderRef();
 }
@@ -385,7 +422,7 @@ function renderRef(){
       <label class="small muted" style="display:flex;gap:6px;align-items:center;margin-top:4px"><input type="checkbox" data-sp-on="${esc(s.key)}" ${s.off?"":"checked"}> ${refs.length} imagen${refs.length!==1?"es":""}</label></div></div>`}).join("");
   $("#pdfBox").hidden=!nPdf;
   $("#pdfPages").innerHTML=S.pdfPages.map(r=>`<div class="pg ${r.off?"off":""}"><img src="${r.thumb}" alt="Página ${r.page}">
-    <span class="small muted">${esc(r.path)}${r.whole?" (página completa)":""}</span>
+    <span class="small muted">${esc(r.path)}</span>${r.caption?`<span class="small muted" style="font-size:.72rem;line-height:1.25" title="${esc(r.caption)}">${esc(r.caption.slice(0,110))}${r.caption.length>110?"…":""}</span>`:""}
     <input type="text" data-pg-label="${r.id}" value="${esc(r.label||"")}" placeholder="Especie de esta imagen">
     <label><input type="checkbox" data-pg-on="${r.id}" ${r.off?"":"checked"}> Usar esta imagen</label></div>`).join("");
   updateRunBtn();
